@@ -1,0 +1,9 @@
+applications:
+- api_domain: some.api
+  application_name: test-app
+  authentication_key: Authorization
+  authentication_mode: header-bearer
+  authentication_value: ${{ jit_secrets.test-app_web }}
+  exclude_paths: []
+  target_url: https://juice-shop.herokuapp.com
+  type: web
