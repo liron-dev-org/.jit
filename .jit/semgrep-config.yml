@@ -1,4030 +1,708 @@
 rules:
-- id: java.lang.security.audit.tainted-ldapi-from-http-request.tainted-ldapi-from-http-request
-  message: Detected input from a HTTPServletRequest going into an LDAP query. This
-    could lead to LDAP injection if the input is not properly sanitized, which could
-    result in attackers modifying objects in the LDAP tree structure. Ensure data
-    passed to an LDAP query is not controllable or properly sanitize the data.
-  metadata:
-    cwe:
-    - 'CWE-90: Improper Neutralization of Special Elements used in an LDAP Query (''LDAP
-      Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    references:
-    - https://sensei.securecodewarrior.com/recipes/scw%3Ajava%3ALDAP-injection
-    category: security
-    technology:
-    - java
-    subcategory:
-    - vuln
-    impact: MEDIUM
-    likelihood: MEDIUM
-    confidence: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-  severity: ERROR
-  languages:
-  - java
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern: "(HttpServletRequest $REQ)"
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: "(javax.naming.directory.InitialDirContext $IDC).search(...)\n"
-      - pattern: "(javax.naming.directory.DirContext $CTX).search(...)\n"
-    - pattern-not: '(javax.naming.directory.InitialDirContext $IDC).search($Y, "...",
-        ...)
-
-        '
-    - pattern-not: '(javax.naming.directory.DirContext $CTX).search($Y, "...", ...)
-
-        '
-- id: java.lang.security.audit.ldap-injection.ldap-injection
-  message: Detected non-constant data passed into an LDAP query. If this data can
-    be controlled by an external user, this is an LDAP injection. Ensure data passed
-    to an LDAP query is not controllable; or properly sanitize the data.
-  metadata:
-    cwe:
-    - 'CWE-90: Improper Neutralization of Special Elements used in an LDAP Query (''LDAP
-      Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#LDAP_INJECTION
-    asvs:
-      section: 'V5: Validation, Sanitization and Encoding Verification Requirements'
-      control_id: 5.3.7 Injection
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v53-output-encoding-and-injection-prevention-requirements
-      version: '4'
-    category: security
-    technology:
-    - java
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-  severity: ERROR
-  languages:
-  - java
-  patterns:
-  - pattern-either:
-    - pattern-inside: |
-        $X $METHOD(...) {
-          ...
-          InitialDirContext $CTX = ...;
-          ...
-        }
-    - pattern-inside: |
-        $X $METHOD(...) {
-          ...
-          DirContext $CTX = ...;
-          ...
-        }
-    - pattern-inside: |
-        $X $METHOD(...) {
-          ...
-          InitialLdapContext $CTX = ...;
-          ...
-        }
-    - pattern-inside: |
-        $X $METHOD(...) {
-          ...
-          LdapContext $CTX = ...;
-          ...
-        }
-    - pattern-inside: |
-        $X $METHOD(...) {
-          ...
-          LdapCtx $CTX = ...;
-          ...
-        }
-    - pattern-inside: |
-        $X $METHOD(...) {
-          ...
-          EventDirContext $CTX = ...;
-          ...
-        }
-  - pattern: |
-      $X $METHOD(...) {
-        ...
-        $CTX.search($Y,$INPUT,...);
-        ...
-      }
-  - pattern-not: |
-      $X $METHOD(...) {
-        ...
-        $CTX.search($Y,"...",...);
-        ...
-      }
-- id: java.lang.security.audit.sqli.jdbc-sqli.jdbc-sqli
-  message: Detected a formatted string in a SQL statement. This could lead to SQL
-    injection if variables in the SQL statement are not properly sanitized. Use a
-    prepared statements (java.sql.PreparedStatement) instead. You can obtain a PreparedStatement
-    using 'connection.prepareStatement'.
-  languages:
-  - java
-  severity: ERROR
-  patterns:
-  - pattern-either:
-    - patterns:
-      - pattern-either:
-        - pattern-inside: |
-            String $SQL = $X + $Y;
-            ...
-        - pattern-inside: |
-            String $SQL = String.format(...);
-            ...
-        - pattern-inside: |
-            $VAL $FUNC(...,String $SQL,...) {
-              ...
-            }
-      - pattern-not-inside: |
-          String $SQL = "..." + "...";
-          ...
-      - pattern: "$S.$METHOD($SQL,...)"
-    - pattern: "$S.$METHOD(String.format(...),...);\n"
-    - pattern: "$S.$METHOD($X + $Y,...);\n"
-  - pattern-either:
-    - pattern-inside: |
-        java.sql.Statement $S = ...;
-        ...
-    - pattern-inside: |
-        $TYPE $FUNC(...,java.sql.Statement $S,...) {
-          ...
-        }
-  - pattern-not: '$S.$METHOD("..." + "...",...);
-
-      '
-  - metavariable-regex:
-      metavariable: "$METHOD"
-      regex: "^(executeQuery|execute|executeUpdate|executeLargeUpdate|addBatch|nativeSQL)$"
-  metadata:
-    cwe:
-    - 'CWE-89: Improper Neutralization of Special Elements used in an SQL Command
-      (''SQL Injection'')'
-    category: security
-    technology:
-    - jdbc
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-- id: java.lang.security.audit.xss.no-direct-response-writer.no-direct-response-writer
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern: "(HttpServletRequest $REQ)"
-  pattern-sanitizers:
-  - by-side-effect: true
-    pattern-either:
-    - patterns:
-      - pattern: |
-          $Y = ....htmlEscape($X);
-          ...
-      - pattern: "$Y"
-    - patterns:
-      - pattern: |
-          $Y = ....escapeHtml($X);
-          ...
-      - pattern: "$Y"
-    - patterns:
-      - pattern: "....encodeForHTML($X)\n"
-      - pattern: "$X"
-    - patterns:
-      - pattern: |
-          $X = "...";
-          ...
-      - pattern: "$X"
-    - patterns:
-      - pattern: |
-          switch ($X) {
-            case ...:
-              ...
-            case $X:
-              $Y = "...";
-              ...
-            ...
-          }
-          ...
-      - pattern: "$Y"
-    - patterns:
-      - pattern: |
-          if ($TRUE) $Y = "...";
-          ...
-      - metavariable-comparison:
-          metavariable: "$TRUE"
-          comparison: "$TRUE == True"
-      - pattern: "$Y"
-    - patterns:
-      - pattern: |
-          if ($FALSE) $Y = ...;
-          else $Y = "...";
-          ...
-      - metavariable-comparison:
-          metavariable: "$FALSE"
-          comparison: "$FALSE == False"
-      - pattern: "$Y"
-  pattern-sinks:
-  - pattern-either:
-    - pattern: "(HttpServletResponse $RESPONSE).getWriter(...).$WRITE(..., $SINK.toCharArray(),
-        ...)\n"
-    - pattern: "(HttpServletResponse $RESPONSE).getWriter(...).$WRITE(..., $SINK,
-        ...)\n"
-    - pattern: "(HttpServletResponse $RESPONSE).getOutputStream(...).$WRITE(..., $SINK,
-        ...)\n"
-    - pattern: "(java.io.PrintWriter $WRITER).$WRITE(..., $SINK, ...)\n"
-    - pattern: "(javax.servlet.ServletOutputStream $WRITER).$WRITE(..., $SINK, ...)\n"
-    - pattern: "(java.io.OutputStream $WRITER).$WRITE(..., $SINK, ...)\n"
-  message: Detected a request with potential user-input going into a OutputStream
-    or Writer object.  This bypasses any view or template environments, including
-    HTML escaping, which may expose this application to cross-site scripting (XSS)
-    vulnerabilities. Consider using a view technology such as JavaServer Faces (JSFs)
-    which automatically escapes HTML views.
-  metadata:
-    owasp:
-    - A07:2017 - Cross-Site Scripting (XSS)
-    - A03:2021 - Injection
-    cwe:
-    - 'CWE-79: Improper Neutralization of Input During Web Page Generation (''Cross-site
-      Scripting'')'
-    references:
-    - https://www3.ntu.edu.sg/home/ehchua/programming/java/JavaServerFaces.html
-    category: security
-    technology:
-    - java
-    - servlets
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: HIGH
-    impact: MEDIUM
-    confidence: MEDIUM
-  severity: ERROR
-  languages:
-  - java
-- id: java.lang.security.audit.tainted-xpath-from-http-request.tainted-xpath-from-http-request
-  message: Detected input from a HTTPServletRequest going into a XPath evaluate or
-    compile command.  This could lead to xpath injection if variables passed into
-    the evaluate or compile commands are not properly sanitized. Xpath injection could
-    lead to unauthorized access to sensitive information in XML documents. Instead,
-    thoroughly sanitize user input or use parameterized xpath queries if you can.
-  languages:
-  - java
-  severity: ERROR
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern: "(HttpServletRequest $REQ).$FUNC(...)\n"
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: "(javax.xml.xpath.XPath $XP).evaluate(...)\n"
-      - pattern: "(javax.xml.xpath.XPath $XP).compile(...).evaluate(...)\n"
-  metadata:
-    category: security
-    technology:
-    - java
-    cwe:
-    - 'CWE-643: Improper Neutralization of Data within XPath Expressions (''XPath
-      Injection'')'
-    owasp:
-    - A03:2021 - Injection
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    subcategory:
-    - vuln
-    likelihood: HIGH
-    impact: MEDIUM
-    confidence: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-- id: java.spring.security.injection.tainted-html-string.tainted-html-string
-  languages:
-  - java
-  severity: ERROR
-  message: Detected user input flowing into a manually constructed HTML string. You
-    may be accidentally bypassing secure methods of rendering HTML by manually constructing
-    HTML and this could create a cross-site scripting vulnerability, which could let
-    attackers steal sensitive user data. To be sure this is safe, check that the HTML
-    is rendered safely. You can use the OWASP ESAPI encoder if you must render user
-    data.
-  metadata:
-    cwe:
-    - 'CWE-79: Improper Neutralization of Input During Web Page Generation (''Cross-site
-      Scripting'')'
-    owasp:
-    - A07:2017 - Cross-Site Scripting (XSS)
-    - A03:2021 - Injection
-    references:
-    - https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
-    category: security
-    technology:
-    - java
-    - spring
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: HIGH
-    impact: MEDIUM
-    confidence: MEDIUM
-    deepsemgrep: true
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern-either:
-      - pattern-inside: "$METHODNAME(..., @$REQ($LOOKUP) $TYPE \n$SOURCE,...) {\n
-          \ ...\n}\n"
-      - pattern-inside: "$METHODNAME(..., @$REQ $TYPE \n$SOURCE,...) {\n  ...\n}\n"
-    - metavariable-regex:
-        metavariable: "$REQ"
-        regex: "(RequestBody|PathVariable|RequestParam)"
-    - pattern: "$SOURCE"
-  pattern-sinks:
-  - patterns:
-    - patterns:
-      - pattern-either:
-        - pattern: '"$HTMLSTR" + ...
-
-            '
-        - pattern: '"$HTMLSTR".concat(...)
-
-            '
-        - patterns:
-          - pattern-inside: |
-              StringBuilder $SB = new StringBuilder("$HTMLSTR");
-              ...
-          - pattern: "$SB.append(...)"
-        - patterns:
-          - pattern-inside: |
-              $VAR = "$HTMLSTR";
-              ...
-          - pattern: "$VAR += ..."
-        - pattern: String.format("$HTMLSTR", ...)
-        - patterns:
-          - pattern-inside: |
-              String $VAR = "$HTMLSTR";
-              ...
-          - pattern: String.format($VAR, ...)
-      - pattern-not: "$HTMLSTR.length();"
-      - metavariable-regex:
-          metavariable: "$HTMLSTR"
-          regex: "^<\\w+"
-- id: java.lang.security.audit.tainted-cmd-from-http-request.tainted-cmd-from-http-request
-  message: Detected input from a HTTPServletRequest going into a 'ProcessBuilder'
-    or 'exec' command.  This could lead to command injection if variables passed into
-    the exec commands are not properly sanitized.  Instead, avoid using these OS commands
-    with user-supplied input, or, if you must use these commands, use a whitelist
-    of specific values.
-  languages:
-  - java
-  severity: ERROR
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern-either:
-      - pattern: "(HttpServletRequest $REQ)\n"
-      - patterns:
-        - pattern-inside: |
-            (javax.servlet.http.Cookie[] $COOKIES) = (HttpServletRequest $REQ).getCookies(...);
-            ...
-            for (javax.servlet.http.Cookie $COOKIE: $COOKIES) {
-              ...
-            }
-        - pattern: "$COOKIE.getValue(...)\n"
-  pattern-sanitizers:
-  - by-side-effect: true
-    pattern-either:
-    - patterns:
-      - pattern: |
-          if ($TRUE) $Y = "...";
-          ...
-      - metavariable-comparison:
-          metavariable: "$TRUE"
-          comparison: "$TRUE == True"
-      - pattern: "$Y"
-    - patterns:
-      - pattern: |
-          if ($FALSE) $Y = ...;
-          else $Y = "...";
-          ...
-      - metavariable-comparison:
-          metavariable: "$FALSE"
-          comparison: "$FALSE == False"
-      - pattern: "$Y"
-  pattern-propagators:
-  - pattern: $Y.put("...",$X);
-    from: "$X"
-    to: "$Y"
-  - pattern: "$Y.add($X);"
-    from: "$X"
-    to: "$Y"
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: "(ProcessBuilder $PB) = ...;\n"
-      - pattern: "(Process $P) = ...;\n"
-  metadata:
-    category: security
-    technology:
-    - java
-    cwe:
-    - 'CWE-78: Improper Neutralization of Special Elements used in an OS Command (''OS
-      Command Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: MEDIUM
-    impact: MEDIUM
-    confidence: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-- id: java.lang.security.audit.command-injection-process-builder.command-injection-process-builder
-  patterns:
-  - pattern-either:
-    - pattern: 'new ProcessBuilder("=~/(sh|bash|ksh|csh|tcsh|zsh)/","-c",$ARG,...)
-
-        '
-    - pattern: 'new ProcessBuilder("cmd","/c",$ARG,...)
-
-        '
-    - pattern: 'new ProcessBuilder(Arrays.asList("cmd","/c",$ARG,...),...)
-
-        '
-    - pattern: 'new ProcessBuilder(new String[]{"cmd","/c",$ARG,...},...)
-
-        '
-    - pattern: 'new ProcessBuilder(new String[]{"sh","-c",$ARG,...},...)
-
-        '
-    - patterns:
-      - pattern-either:
-        - pattern: 'new ProcessBuilder($CMD,"/c",$ARG,...)
-
-            '
-        - pattern: 'new ProcessBuilder(Arrays.asList($CMD,"/c",$ARG,...),...)
-
-            '
-        - pattern: 'new ProcessBuilder(new String[]{$CMD,"/c",$ARG,...},...)
-
-            '
-      - pattern-inside: |
-          $CMD = "cmd";
-          ...
-  - pattern-not-inside: |
-      $ARG = "...";
-      ...
-  - pattern-not: 'new ProcessBuilder("...","...","...",...)
-
-      '
-  - pattern-not: 'new ProcessBuilder(new String[]{"...","...","...",...},...)
-
-      '
-  - pattern-not: 'new ProcessBuilder(Arrays.asList("...","...","...",...),...)
-
-      '
-  message: A formatted or concatenated string was detected as input to a ProcessBuilder
-    call. This is dangerous if a variable is controlled by user input and could result
-    in a command injection. Ensure your variables are not controlled by users or sufficiently
-    sanitized.
-  metadata:
-    cwe:
-    - 'CWE-78: Improper Neutralization of Special Elements used in an OS Command (''OS
-      Command Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    category: security
-    technology:
-    - java
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-  severity: ERROR
-  languages:
-  - java
-- id: java.lang.security.audit.xxe.documentbuilderfactory-disallow-doctype-decl-false.documentbuilderfactory-disallow-doctype-decl-false
-  severity: ERROR
-  metadata:
-    cwe:
-    - 'CWE-611: Improper Restriction of XML External Entity Reference'
-    owasp:
-    - A04:2017 - XML External Entities (XXE)
-    - A05:2021 - Security Misconfiguration
-    asvs:
-      section: V5 Validation, Sanitization and Encoding
-      control_id: 5.5.2 Insecue XML Deserialization
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v55-deserialization-prevention
-      version: '4'
-    references:
-    - https://semgrep.dev/blog/2022/xml-security-in-java
-    - https://semgrep.dev/docs/cheat-sheets/java-xxe/
-    - https://blog.sonarsource.com/secure-xml-processor
-    - https://xerces.apache.org/xerces2-j/features.html
-    category: security
-    technology:
-    - java
-    - xml
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: LOW
-    impact: HIGH
-    confidence: HIGH
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.audit.xxe.documentbuilderfactory-disallow-doctype-decl-false.documentbuilderfactory-disallow-doctype-decl-false
-    shortlink: https://sg.run/4Dv5
-    semgrep.dev:
-      rule:
-        rule_id: j2UrJ8
-        version_id: QkTjOr
-        url: https://semgrep.dev/playground/r/QkTjOr/java.lang.security.audit.xxe.documentbuilderfactory-disallow-doctype-decl-false.documentbuilderfactory-disallow-doctype-decl-false
-  message: DOCTYPE declarations are enabled for this DocumentBuilderFactory. Without
-    prohibiting external entity declarations, this is vulnerable to XML external entity
-    attacks. Disable this by setting the feature "http://apache.org/xml/features/disallow-doctype-decl"
-    to true. Alternatively, allow DOCTYPE declarations and only prohibit external
-    entities declarations. This can be done by setting the features "http://xml.org/sax/features/external-general-entities"
-    and "http://xml.org/sax/features/external-parameter-entities" to false.
-  patterns:
-  - pattern: $DBFACTORY.setFeature("http://apache.org/xml/features/disallow-doctype-decl",
-      false);
-  - pattern-not-inside: |
-      $RETURNTYPE $METHOD(...){
-        ...
-        $DBF.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        ...
-        $DBF.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        ...
-      }
-  - pattern-not-inside: |
-      $RETURNTYPE $METHOD(...){
-        ...
-        $DBF.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        ...
-        $DBF.setFeature("http://xml.org/sax/features/external-general-entities", false);
-        ...
-      }
-  - pattern-not-inside: |
-      $RETURNTYPE $METHOD(...){
-        ...
-        $DBF.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-        ...
-        $DBF.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-        ...
-      }
-  - pattern-not-inside: |
-      $RETURNTYPE $METHOD(...){
-        ...
-        $DBF.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-        ...
-        $DBF.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-        ...
-      }
-  languages:
-  - java
-- id: java.lang.security.audit.xxe.documentbuilderfactory-external-general-entities-true.documentbuilderfactory-external-general-entities-true
-  severity: ERROR
-  metadata:
-    cwe:
-    - 'CWE-611: Improper Restriction of XML External Entity Reference'
-    owasp:
-    - A04:2017 - XML External Entities (XXE)
-    - A05:2021 - Security Misconfiguration
-    asvs:
-      section: V5 Validation, Sanitization and Encoding
-      control_id: 5.5.2 Insecue XML Deserialization
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v55-deserialization-prevention
-      version: '4'
-    references:
-    - https://semgrep.dev/blog/2022/xml-security-in-java
-    - https://semgrep.dev/docs/cheat-sheets/java-xxe/
-    - https://blog.sonarsource.com/secure-xml-processor
-    category: security
-    technology:
-    - java
-    - xml
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: LOW
-    impact: HIGH
-    confidence: HIGH
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.audit.xxe.documentbuilderfactory-external-general-entities-true.documentbuilderfactory-external-general-entities-true
-    shortlink: https://sg.run/JgPy
-    semgrep.dev:
-      rule:
-        rule_id: 9AUJ6r
-        version_id: 44Twdj
-        url: https://semgrep.dev/playground/r/44Twdj/java.lang.security.audit.xxe.documentbuilderfactory-external-general-entities-true.documentbuilderfactory-external-general-entities-true
-  message: External entities are allowed for this DocumentBuilderFactory. This is
-    vulnerable to XML external entity attacks. Disable this by setting the feature
-    "http://xml.org/sax/features/external-general-entities" to false.
-  pattern: $DBFACTORY.setFeature("http://xml.org/sax/features/external-general-entities",
-    true);
-  fix: $DBFACTORY.setFeature("http://xml.org/sax/features/external-general-entities",
-    false);
-  languages:
-  - java
-- id: java.lang.security.audit.xxe.documentbuilderfactory-external-parameter-entities-true.documentbuilderfactory-external-parameter-entities-true
-  severity: ERROR
-  metadata:
-    cwe:
-    - 'CWE-611: Improper Restriction of XML External Entity Reference'
-    owasp:
-    - A04:2017 - XML External Entities (XXE)
-    - A05:2021 - Security Misconfiguration
-    asvs:
-      section: V5 Validation, Sanitization and Encoding
-      control_id: 5.5.2 Insecue XML Deserialization
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v55-deserialization-prevention
-      version: '4'
-    references:
-    - https://semgrep.dev/blog/2022/xml-security-in-java
-    - https://semgrep.dev/docs/cheat-sheets/java-xxe/
-    - https://blog.sonarsource.com/secure-xml-processor
-    category: security
-    technology:
-    - java
-    - xml
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: LOW
-    impact: HIGH
-    confidence: HIGH
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.audit.xxe.documentbuilderfactory-external-parameter-entities-true.documentbuilderfactory-external-parameter-entities-true
-    shortlink: https://sg.run/5Lv0
-    semgrep.dev:
-      rule:
-        rule_id: yyUNeo
-        version_id: PkTXyy
-        url: https://semgrep.dev/playground/r/PkTXyy/java.lang.security.audit.xxe.documentbuilderfactory-external-parameter-entities-true.documentbuilderfactory-external-parameter-entities-true
-  message: External entities are allowed for this DocumentBuilderFactory. This is
-    vulnerable to XML external entity attacks. Disable this by setting the feature
-    "http://xml.org/sax/features/external-parameter-entities" to false.
-  pattern: $DBFACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities",
-    true);
-  fix: $DBFACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities",
-    false);
-  languages:
-  - java
-- id: java.spring.security.injection.tainted-sql-string.tainted-sql-string
-  languages:
-  - java
-  severity: ERROR
-  message: User data flows into this manually-constructed SQL string. User data can
-    be safely inserted into SQL strings using prepared statements or an object-relational
-    mapper (ORM). Manually-constructed SQL strings is a possible indicator of SQL
-    injection, which could let an attacker steal or manipulate data from the database.
-    Instead, use prepared statements (`connection.PreparedStatement`) or a safe library.
-  metadata:
-    cwe:
-    - 'CWE-89: Improper Neutralization of Special Elements used in an SQL Command
-      (''SQL Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    references:
-    - https://docs.oracle.com/javase/7/docs/api/java/sql/PreparedStatement.html
-    category: security
-    technology:
-    - spring
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: HIGH
-    impact: MEDIUM
-    confidence: MEDIUM
-    deepsemgrep: true
-    source: https://semgrep.dev/r/java.spring.security.injection.tainted-sql-string.tainted-sql-string
-    shortlink: https://sg.run/9rzz
-    semgrep.dev:
-      rule:
-        rule_id: 10UdRR
-        version_id: yeTbjy
-        url: https://semgrep.dev/playground/r/yeTbjy/java.spring.security.injection.tainted-sql-string.tainted-sql-string
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern-either:
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ($LOOKUP) $TYPE $SOURCE,...) {
-            ...
-          }
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ $TYPE $SOURCE,...) {
-            ...
-          }
-    - metavariable-regex:
-        metavariable: "$REQ"
-        regex: "(RequestBody|PathVariable|RequestParam|RequestHeader|CookieValue)"
-    - pattern: "$SOURCE"
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: '"$SQLSTR" + ...
-
-          '
-      - pattern: '"$SQLSTR".concat(...)
-
-          '
-      - patterns:
-        - pattern-inside: |
-            StringBuilder $SB = new StringBuilder("$SQLSTR");
-            ...
-        - pattern: "$SB.append(...)"
-      - patterns:
-        - pattern-inside: |
-            $VAR = "$SQLSTR";
-            ...
-        - pattern: "$VAR += ..."
-      - pattern: String.format("$SQLSTR", ...)
-      - patterns:
-        - pattern-inside: |
-            String $VAR = "$SQLSTR";
-            ...
-        - pattern: String.format($VAR, ...)
-    - pattern-not-inside: System.out.println(...)
-    - pattern-not-inside: "$LOG.info(...)"
-    - pattern-not-inside: "$LOG.warn(...)"
-    - pattern-not-inside: "$LOG.warning(...)"
-    - pattern-not-inside: "$LOG.debug(...)"
-    - pattern-not-inside: "$LOG.debugging(...)"
-    - pattern-not-inside: "$LOG.error(...)"
-    - metavariable-regex:
-        metavariable: "$SQLSTR"
-        regex: "(?i)(select|delete|insert|create|update|alter|drop)\\b"
-- id: java.spring.security.injection.tainted-system-command.tainted-system-command
-  languages:
-  - java
-  severity: ERROR
-  mode: taint
-  pattern-propagators:
-  - pattern: "(StringBuilder $STRB).append($INPUT)"
-    from: "$INPUT"
-    to: "$STRB"
-  pattern-sources:
-  - patterns:
-    - pattern-either:
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ($LOOKUP) $TYPE $SOURCE,...) {
-            ...
-          }
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ $TYPE $SOURCE,...) {
-            ...
-          }
-    - metavariable-regex:
-        metavariable: "$REQ"
-        regex: "(RequestBody|PathVariable|RequestParam|RequestHeader|CookieValue|ModelAttribute)"
-    - pattern: "$SOURCE"
-    label: INPUT
-  - patterns:
-    - pattern-either:
-      - pattern: "$X + $SOURCE"
-      - pattern: "$SOURCE + $Y"
-      - pattern: "(StringBuilder $STRB).append($SOURCE)"
-      - pattern: String.format("...", ..., $SOURCE, ...)
-      - pattern: String.join("...", ..., $SOURCE, ...)
-      - pattern: "(String $STR).concat($SOURCE)"
-      - pattern: "$SOURCE.concat(...)"
-      - pattern: "$X += SOURCE"
-      - pattern: "$SOURCE += $X"
-    label: CONCAT
-    requires: INPUT
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: "(Process $P) = new Process(...);\n"
-      - pattern: "(ProcessBuilder $PB).command(...);\n"
-      - patterns:
-        - pattern-either:
-          - pattern: "(Runtime $R).$EXEC(...);\n"
-          - pattern: 'Runtime.getRuntime(...).$EXEC(...);
-
-              '
-        - metavariable-regex:
-            metavariable: "$EXEC"
-            regex: "(exec|loadLibrary|load)"
-      - patterns:
-        - pattern: "(ProcessBuilder $PB).command(...).$ADD(...);\n"
-        - metavariable-regex:
-            metavariable: "$ADD"
-            regex: "(add|addAll)"
-      - patterns:
-        - pattern-either:
-          - patterns:
-            - pattern-inside: |
-                $BUILDER = new ProcessBuilder(...);
-                ...
-            - pattern: "$BUILDER.start(...)"
-          - pattern: 'new ProcessBuilder(...). ... .start(...);
-
-              '
-    requires: CONCAT
-  message: 'Detected user input entering a method which executes a system command.
-    This could result in a command injection vulnerability, which allows an attacker
-    to inject an arbitrary system command onto the server. The attacker could download
-    malware onto or steal data from the server. Instead, use ProcessBuilder, separating
-    the command into individual arguments, like this: `new ProcessBuilder("ls", "-al",
-    targetDirectory)`. Further, make sure you hardcode or allowlist the actual command
-    so that attackers can''t run arbitrary commands.'
-  metadata:
-    cwe:
-    - 'CWE-78: Improper Neutralization of Special Elements used in an OS Command (''OS
-      Command Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    category: security
-    technology:
-    - java
-    - spring
-    confidence: HIGH
-    references:
-    - https://www.stackhawk.com/blog/command-injection-java/
-    - https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html
-    - https://github.com/github/codeql/blob/main/java/ql/src/Security/CWE/CWE-078/ExecUnescaped.java
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: HIGH
-    impact: HIGH
-    deepsemgrep: true
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.spring.security.injection.tainted-system-command.tainted-system-command
-    shortlink: https://sg.run/epY0
-    semgrep.dev:
-      rule:
-        rule_id: 6JUxGN
-        version_id: YDTK40
-        url: https://semgrep.dev/playground/r/YDTK40/java.spring.security.injection.tainted-system-command.tainted-system-command
-- id: java.lang.security.xmlinputfactory-external-entities-enabled.xmlinputfactory-external-entities-enabled
-  severity: ERROR
-  metadata:
-    cwe:
-    - 'CWE-611: Improper Restriction of XML External Entity Reference'
-    owasp:
-    - A04:2017 - XML External Entities (XXE)
-    - A05:2021 - Security Misconfiguration
-    asvs:
-      section: V5 Validation, Sanitization and Encoding
-      control_id: 5.5.2 Insecue XML Deserialization
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v55-deserialization-prevention
-      version: '4'
-    references:
-    - https://semgrep.dev/blog/2022/xml-security-in-java
-    - https://semgrep.dev/docs/cheat-sheets/java-xxe/
-    - https://www.blackhat.com/docs/us-15/materials/us-15-Wang-FileCry-The-New-Age-Of-XXE-java-wp.pdf
-    category: security
-    technology:
-    - java
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.xmlinputfactory-external-entities-enabled.xmlinputfactory-external-entities-enabled
-    shortlink: https://sg.run/2x75
-    semgrep.dev:
-      rule:
-        rule_id: x8Unkq
-        version_id: JdTYjW
-        url: https://semgrep.dev/playground/r/JdTYjW/java.lang.security.xmlinputfactory-external-entities-enabled.xmlinputfactory-external-entities-enabled
-  message: XML external entities are enabled for this XMLInputFactory. This is vulnerable
-    to XML external entity attacks. Disable external entities by setting "javax.xml.stream.isSupportingExternalEntities"
-    to false.
-  pattern: $XMLFACTORY.setProperty("javax.xml.stream.isSupportingExternalEntities",
-    true);
-  languages:
-  - java
-- id: java.java-jwt.security.jwt-none-alg.java-jwt-none-alg
-  message: Detected use of the 'none' algorithm in a JWT token. The 'none' algorithm
-    assumes the integrity of the token has already been verified. This would allow
-    a malicious actor to forge a JWT token that will automatically be verified. Do
-    not explicitly use the 'none' algorithm. Instead, use an algorithm such as 'HS256'.
-  metadata:
-    cwe:
-    - 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
-    owasp:
-    - A03:2017 - Sensitive Data Exposure
-    - A02:2021 - Cryptographic Failures
-    source-rule-url: https://r2c.dev/blog/2020/hardcoded-secrets-unverified-tokens-and-other-common-jwt-mistakes/
-    category: security
-    technology:
-    - jwt
-    confidence: HIGH
-    references:
-    - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
-    subcategory:
-    - vuln
-    likelihood: HIGH
-    impact: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.java-jwt.security.jwt-none-alg.java-jwt-none-alg
-    shortlink: https://sg.run/Av14
-    semgrep.dev:
-      rule:
-        rule_id: zdUkzR
-        version_id: DkTeAv
-        url: https://semgrep.dev/playground/r/DkTeAv/java.java-jwt.security.jwt-none-alg.java-jwt-none-alg
-  languages:
-  - java
-  severity: ERROR
-  pattern-either:
-  - pattern: "$JWT.sign(com.auth0.jwt.algorithms.Algorithm.none());\n"
-  - pattern: |
-      $NONE = com.auth0.jwt.algorithms.Algorithm.none();
-      ...
-      $JWT.sign($NONE);
-  - pattern: |-
-      class $CLASS {
-        ...
-        $TYPE $NONE = com.auth0.jwt.algorithms.Algorithm.none();
-        ...
-        $RETURNTYPE $FUNC (...) {
-          ...
-          $JWT.sign($NONE);
-          ...
-        }
-        ...
-      }
-- id: java.jboss.security.session_sqli.find-sql-string-concatenation
-  message: In $METHOD, $X is used to construct a SQL query via string concatenation.
-  languages:
-  - java
-  severity: ERROR
-  pattern-either:
-  - pattern: |
-      $RETURN $METHOD(...,String $X,...){
-        ...
-        Session $SESSION = ...;
-        ...
-        String $QUERY = ... + $X + ...;
-        ...
-        PreparedStatement $PS = $SESSION.connection().prepareStatement($QUERY);
-        ...
-        ResultSet $RESULT = $PS.executeQuery();
-        ...
-      }
-  - pattern: |
-      $RETURN $METHOD(...,String $X,...){
-        ...
-        String $QUERY = ... + $X + ...;
-        ...
-        Session $SESSION = ...;
-        ...
-        PreparedStatement $PS = $SESSION.connection().prepareStatement($QUERY);
-        ...
-        ResultSet $RESULT = $PS.executeQuery();
-        ...
-      }
-  metadata:
-    category: security
-    technology:
-    - jboss
-    confidence: MEDIUM
-    cwe:
-    - 'CWE-89: Improper Neutralization of Special Elements used in an SQL Command
-      (''SQL Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: LOW
-    impact: HIGH
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.jboss.security.session_sqli.find-sql-string-concatenation
-    shortlink: https://sg.run/W8kA
-    semgrep.dev:
-      rule:
-        rule_id: X5U8rQ
-        version_id: qkTK3A
-        url: https://semgrep.dev/playground/r/qkTK3A/java.jboss.security.session_sqli.find-sql-string-concatenation
-- id: java.jjwt.security.jwt-none-alg.jjwt-none-alg
-  message: Detected use of the 'none' algorithm in a JWT token. The 'none' algorithm
-    assumes the integrity of the token has already been verified. This would allow
-    a malicious actor to forge a JWT token that will automatically be verified. Do
-    not explicitly use the 'none' algorithm. Instead, use an algorithm such as 'HS256'.
-  metadata:
-    cwe:
-    - 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
-    owasp:
-    - A03:2017 - Sensitive Data Exposure
-    - A02:2021 - Cryptographic Failures
-    source-rule-url: https://r2c.dev/blog/2020/hardcoded-secrets-unverified-tokens-and-other-common-jwt-mistakes/
-    asvs:
-      section: 'V3: Session Management Verification Requirements'
-      control_id: 3.5.3 Insecue Stateless Session Tokens
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x12-V3-Session-management.md#v35-token-based-session-management
-      version: '4'
-    category: security
-    technology:
-    - jwt
-    confidence: LOW
-    references:
-    - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.jjwt.security.jwt-none-alg.jjwt-none-alg
-    shortlink: https://sg.run/0Q7b
-    semgrep.dev:
-      rule:
-        rule_id: j2Uvol
-        version_id: l4TNGq
-        url: https://semgrep.dev/playground/r/l4TNGq/java.jjwt.security.jwt-none-alg.jjwt-none-alg
-  languages:
-  - java
-  severity: ERROR
-  patterns:
-  - pattern: 'io.jsonwebtoken.Jwts.builder();
-
-      '
-  - pattern-not-inside: |-
-      $RETURNTYPE $FUNC(...) {
-        ...
-        $JWTS.signWith(...);
-        ...
-      }
-- id: java.lang.security.httpservlet-path-traversal.httpservlet-path-traversal
-  metadata:
-    cwe:
-    - 'CWE-22: Improper Limitation of a Pathname to a Restricted Directory (''Path
-      Traversal'')'
-    owasp:
-    - A05:2017 - Broken Access Control
-    - A01:2021 - Broken Access Control
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#PATH_TRAVERSAL_IN
-    references:
-    - https://www.owasp.org/index.php/Path_Traversal
-    category: security
-    technology:
-    - java
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: HIGH
-    impact: MEDIUM
-    confidence: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.httpservlet-path-traversal.httpservlet-path-traversal
-    shortlink: https://sg.run/oxXN
-    semgrep.dev:
-      rule:
-        rule_id: NbUk7X
-        version_id: bZT4eN
-        url: https://semgrep.dev/playground/r/bZT4eN/java.lang.security.httpservlet-path-traversal.httpservlet-path-traversal
-  message: Detected a potential path traversal. A malicious actor could control the
-    location of this file, to include going backwards in the directory with '../'.
-    To address this, ensure that user-controlled variables in file paths are sanitized.
-    You may also consider using a utility method such as org.apache.commons.io.FilenameUtils.getName(...)
-    to only retrieve the file name from the path.
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern-either:
-      - pattern: "(HttpServletRequest $REQ)\n"
-      - patterns:
-        - pattern-inside: |
-            (javax.servlet.http.Cookie[] $COOKIES) = (HttpServletRequest $REQ).getCookies(...);
-            ...
-            for (javax.servlet.http.Cookie $COOKIE: $COOKIES) {
-              ...
-            }
-        - pattern: "$COOKIE.getValue(...)\n"
-      - patterns:
-        - pattern-inside: |
-            $TYPE[] $VALS = (HttpServletRequest $REQ).$GETFUNC(...);
-            ...
-        - pattern: "$PARAM = $VALS[$INDEX];\n"
-  pattern-sanitizers:
-  - pattern: org.apache.commons.io.FilenameUtils.getName(...)
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: "(java.io.File $FILE) = ...\n"
-      - pattern: "(java.io.FileOutputStream $FOS) = ...\n"
-      - pattern: 'new java.io.FileInputStream(...)
-
-          '
-  severity: ERROR
-  languages:
-  - java
-- id: java.rmi.security.server-dangerous-object-deserialization.server-dangerous-object-deserialization
-  severity: ERROR
-  metadata:
-    cwe:
-    - 'CWE-502: Deserialization of Untrusted Data'
-    owasp:
-    - A08:2017 - Insecure Deserialization
-    - A08:2021 - Software and Data Integrity Failures
-    references:
-    - https://mogwailabs.de/blog/2019/03/attacking-java-rmi-services-after-jep-290/
-    - https://frohoff.github.io/appseccali-marshalling-pickles/
-    category: security
-    technology:
-    - rmi
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.rmi.security.server-dangerous-object-deserialization.server-dangerous-object-deserialization
-    shortlink: https://sg.run/zvnl
-    semgrep.dev:
-      rule:
-        rule_id: NbUkw5
-        version_id: d6TbGy
-        url: https://semgrep.dev/playground/r/d6TbGy/java.rmi.security.server-dangerous-object-deserialization.server-dangerous-object-deserialization
-  message: Using an arbitrary object ('Object $PARAM') with Java RMI is an insecure
-    deserialization vulnerability. This object can be manipulated by a malicious actor
-    allowing them to execute code on your system. Instead, use an integer ID to look
-    up your object, or consider alternative serialization schemes such as JSON.
-  languages:
-  - java
-  pattern: |
-    interface $INTERFACE extends Remote {
-      $RETURNTYPE $METHOD(Object $PARAM) throws RemoteException;
-    }
-- id: java.aws-lambda.security.tainted-sql-string.tainted-sql-string
-  languages:
-  - java
-  severity: ERROR
-  message: Detected user input used to manually construct a SQL string. This is usually
-    bad practice because manual construction could accidentally result in a SQL injection.
-    An attacker could use a SQL injection to steal or modify contents of the database.
-    Instead, use a parameterized query which is available by default in most database
-    engines. Alternatively, consider using an object-relational mapper (ORM) such
-    as Sequelize which will protect your queries.
-  metadata:
-    references:
-    - https://owasp.org/www-community/attacks/SQL_Injection
-    category: security
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    cwe:
-    - 'CWE-89: Improper Neutralization of Special Elements used in an SQL Command
-      (''SQL Injection'')'
-    technology:
-    - aws-lambda
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: MEDIUM
-    impact: HIGH
-    confidence: MEDIUM
-    deepsemgrep: true
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.aws-lambda.security.tainted-sql-string.tainted-sql-string
-    shortlink: https://sg.run/EBYN
-    semgrep.dev:
-      rule:
-        rule_id: YGUl4z
-        version_id: pZTgWP
-        url: https://semgrep.dev/playground/r/pZTgWP/java.aws-lambda.security.tainted-sql-string.tainted-sql-string
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern: "$EVENT"
-    - pattern-either:
-      - pattern-inside: |
-          $HANDLERTYPE $HANDLER($TYPE $EVENT, com.amazonaws.services.lambda.runtime.Context $CONTEXT) {
-            ...
-          }
-      - pattern-inside: |
-          $HANDLERTYPE $HANDLER(InputStream $EVENT, OutputStream $OUT, com.amazonaws.services.lambda.runtime.Context $CONTEXT) {
-            ...
-          }
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: '"$SQLSTR" + ...
-
-          '
-      - pattern: '"$SQLSTR".concat(...)
-
-          '
-      - patterns:
-        - pattern-inside: |
-            StringBuilder $SB = new StringBuilder("$SQLSTR");
-            ...
-        - pattern: "$SB.append(...)"
-      - patterns:
-        - pattern-inside: |
-            $VAR = "$SQLSTR";
-            ...
-        - pattern: "$VAR += ..."
-      - pattern: String.format("$SQLSTR", ...)
-    - metavariable-regex:
-        metavariable: "$SQLSTR"
-        regex: "(?i)(select|delete|insert|create|update|alter|drop)\\b"
-    - pattern-not-inside: 'System.out.$PRINTLN(...)
-
-        '
-- id: java.lang.security.audit.xxe.documentbuilderfactory-disallow-doctype-decl-missing.documentbuilderfactory-disallow-doctype-decl-missing
-  severity: ERROR
-  metadata:
-    cwe:
-    - 'CWE-611: Improper Restriction of XML External Entity Reference'
-    owasp:
-    - A04:2017 - XML External Entities (XXE)
-    - A05:2021 - Security Misconfiguration
-    asvs:
-      section: V5 Validation, Sanitization and Encoding
-      control_id: 5.5.2 Insecue XML Deserialization
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v55-deserialization-prevention
-      version: '4'
-    references:
-    - https://semgrep.dev/blog/2022/xml-security-in-java
-    - https://semgrep.dev/docs/cheat-sheets/java-xxe/
-    - https://blog.sonarsource.com/secure-xml-processor
-    - https://xerces.apache.org/xerces2-j/features.html
-    category: security
-    technology:
-    - java
-    - xml
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    likelihood: LOW
-    impact: HIGH
-    confidence: HIGH
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.audit.xxe.documentbuilderfactory-disallow-doctype-decl-missing.documentbuilderfactory-disallow-doctype-decl-missing
-    shortlink: https://sg.run/PYBz
-    semgrep.dev:
-      rule:
-        rule_id: 10UPQB
-        version_id: 3ZTz1w
-        url: https://semgrep.dev/playground/r/3ZTz1w/java.lang.security.audit.xxe.documentbuilderfactory-disallow-doctype-decl-missing.documentbuilderfactory-disallow-doctype-decl-missing
-  message: DOCTYPE declarations are enabled for this DocumentBuilderFactory. This
-    is vulnerable to XML external entity attacks. Disable this by setting the feature
-    "http://apache.org/xml/features/disallow-doctype-decl" to true. Alternatively,
-    allow DOCTYPE declarations and only prohibit external entities declarations. This
-    can be done by setting the features "http://xml.org/sax/features/external-general-entities"
-    and "http://xml.org/sax/features/external-parameter-entities" to false.
-  mode: taint
-  pattern-sources:
-  - by-side-effect: true
+  - id: double-free
     patterns:
-    - pattern-either:
-      - pattern: "$FACTORY = DocumentBuilderFactory.newInstance();\n"
+    - pattern-not: |
+        free($VAR);
+        ...
+        $VAR = NULL;
+        ...
+        free($VAR);
+    - pattern-not: |
+        free($VAR);
+        ...
+        $VAR = malloc(...);
+        ...
+        free($VAR);
+    - pattern-inside: |
+        free($VAR);
+        ...
+        $FREE($VAR);
+    - metavariable-pattern:
+        metavariable: $FREE
+        pattern: free
+    - focus-metavariable: $FREE
+    message: >-
+      Variable '$VAR' was freed twice. This can lead to undefined behavior.
+    metadata:
+      cwe:
+      - 'CWE-415: Double Free'
+      owasp:
+      - A03:2021 - Injection
+      - A01:2017 - Injection
+      references:
+      - https://cwe.mitre.org/data/definitions/415.html
+      - https://owasp.org/www-community/vulnerabilities/Doubly_freeing_memory
+      category: security
+      technology:
+      - c
+      confidence: MEDIUM
+      subcategory:
+      - vuln
+      likelihood: LOW
+      impact: HIGH
+    languages: [c]
+    severity: ERROR
+  - id: function-use-after-free
+    patterns:
+      - pattern-either:
+        - pattern: $FUNC(..., <... $VAR ...>, ...)
+        - pattern: $FUNC(..., <... $VAR->$ACCESSOR ...>, ...)
+        - pattern: $FUNC(..., <... (*$VAR).$ACCESSOR ...>, ...)
+        - pattern: $FUNC(..., <... $VAR[$NUM] ...>, ...)
+      - metavariable-regex:
+          metavariable: $FUNC
+          regex: (?!^free$)
+      - pattern-inside:
+          free($VAR);
+          ...
+      - pattern-not-inside:
+          free($VAR);
+          ...
+          $VAR = NULL;
+          ...
+      - pattern-not-inside:
+          free($VAR);
+          ...
+          $VAR = malloc(...);
+          ...
+    message: Variable '$VAR' was passed to a function after being freed. This can lead to undefined behavior.
+    metadata:
+      cwe:
+        - "CWE-416: Use After Free"
+      references:
+        - https://cwe.mitre.org/data/definitions/416.html
+        - https://ctf-wiki.github.io/ctf-wiki/pwn/linux/glibc-heap/use_after_free/
+      category: security
+      technology:
+        - c
+      confidence: MEDIUM
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: HIGH
+    languages:
+      - c
+    severity: ERROR
+  - id: buffer-overflow-strcpy-stpcpy-strcat
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/676
+        - https://cwe.mitre.org/data/definitions/120
+        - https://cwe.mitre.org/data/definitions/787
+        - https://g.co/kgs/PCHQjJ
+      confidence: HIGH
+    message: >-
+      A buffer overflow condition exists when a program attempts to put
+      more data in a buffer than it can hold, or when a program attempts to
+      put data in a memory area outside of the boundaries of a buffer.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    patterns:
+      - pattern-either:
+          - pattern: strcpy(...)
+          - pattern: stpcpy(...)
+          - pattern: strcat(...)
+          - pattern: wcscpy(...)
+          - pattern: wcpcpy(...)
+          - pattern: wcscat(...)
+      - pattern-not: $FUN($BUF, "...", ...)
+  - id: command-injection
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/676
+        - https://cwe.mitre.org/data/definitions/78
+        - https://cwe.mitre.org/data/definitions/88
+        - https://g.co/kgs/PCHQjJ
+        - https://www.sei.cmu.edu/downloads/sei-cert-c-coding-standard-2016-v01.pdf
+      confidence: HIGH
+    message: >-
+      The software constructs an OS command using externally-influenced input,
+      but it does not neutralize or incorrectly neutralizes special elements
+      that could modify the intended OS command.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    patterns:
+      - pattern-either:
+          - pattern: system(...)
+          - pattern: popen(...)
+      - pattern-not: $FUN("...", ...)
+  - id: insecure-use-strtok-fn
+    pattern: strtok(...)
+    message: >-
+      The strtok() function is unsafe in concurrent environments. strtok() modifies
+      the input string by replacing delimiters with null bytes and maintains internal
+      state between calls, making it unsafe in threads or asynchronous code. Instead,
+      use the thread-safe alternative strtok_r(), which doesn't modify the original
+      string and maintains its state via a user-supplied pointer. This replacement
+      enhances both the safety and predictability of your code, mitigating risks
+      related to concurrent execution and string corruption.
+    metadata:
+      cwe:
+      - 'CWE-676: Use of Potentially Dangerous Function'
+      references:
+      - https://wiki.sei.cmu.edu/confluence/display/c/STR06-C.+Do+not+assume+that+strtok%28%29+leaves+the+parse+string+unchanged
+      - https://man7.org/linux/man-pages/man3/strtok.3.html#BUGS
+      - https://stackoverflow.com/a/40335556
+      category: security
+      technology:
+      - c
+      confidence: LOW
+      subcategory:
+      - audit
+      likelihood: LOW
+      impact: HIGH
+    languages: [c]
+    severity: ERROR
+  - id: buffer-overflow-gets
+    pattern: gets(...)
+    message: >-
+      The gets() function is inherently insecure due to its inability to prevent
+      buffer overflows. gets() reads input without checking buffer boundaries, potentially
+      allowing an attacker to overwrite memory. Replace gets() with safer alternatives like
+      fgets() or gets_s(). fgets() is widely supported and allows specifying buffer size,
+      while gets_s() is a C11 standard function designed as a secure replacement for gets().
+      Using these alternatives helps prevent buffer overflows and enhances the security of your application.
+    metadata:
+      cwe:
+      - 'CWE-676: Use of Potentially Dangerous Function'
+      references:
+      - https://us-cert.cisa.gov/bsi/articles/knowledge/coding-practices/fgets-and-gets_s
+      category: security
+      technology:
+      - c
+      confidence: MEDIUM
+      subcategory:
+      - audit
+      likelihood: LOW
+      impact: HIGH
+    languages: [c]
+    severity: ERROR
+  - id: use-after-free
+    patterns:
+      - pattern-either:
+        - pattern: $VAR->$ACCESSOR
+        - pattern: (*$VAR).$ACCESSOR
+        - pattern: $VAR[$NUM]
+      - pattern-inside:
+          free($VAR);
+          ...
+      - pattern-not-inside:
+          $VAR = NULL;
+          ...
+      - pattern-not-inside:
+          free($VAR);
+          ...
+          $VAR = malloc(...);
+          ...
+    message: >-
+      Variable '$VAR' was used after being freed. Program accesses memory via a pointer after that
+      memory has been freed. This can lead to crashes, data corruption, or security breaches.
+      To prevent this, ensure pointers are set to NULL or reassigned to valid memory after a free() call.
+      Proper pointer and memory management is crucial for secure and stable applications.
+    metadata:
+      cwe:
+        - "CWE-416: Use After Free"
+      references:
+        - https://cwe.mitre.org/data/definitions/416.html
+        - https://ctf-wiki.github.io/ctf-wiki/pwn/linux/glibc-heap/use_after_free/
+      category: security
+      technology:
+        - c
+      confidence: MEDIUM
+      cwe2022-top25: true
+      cwe2021-top25: true
+      subcategory:
+        - vuln
+      likelihood: LOW
+      impact: HIGH
+    languages:
+      - c
+    severity: ERROR
+  - id: validate-setuid-seteuid-results
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/252
+        - https://lwn.net/Articles/451985/
+        - https://www.usenix.org/legacy/events/sec02/full_papers/chen/chen.pdf
+      confidence: MEDIUM
+    message: >-
+      The software does not check the return value from a method or
+      function, which can prevent it from detecting unexpected states and
+      conditions. If the program calls a function to drop privileges but
+      does not check the return code to ensure that privileges were
+      successfully dropped, then the program will continue to operate with
+      the higher privileges.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
       - patterns:
-        - pattern: "$FACTORY"
-        - pattern-inside: |
-            class $C {
+          - pattern: setuid(...)
+          - pattern-not-inside: $RET = setuid(...)
+          - pattern-not-inside: <... setuid(...) == $VAL ...>
+          - pattern-not-inside: <... setuid(...) != $VAL ...>
+          - pattern-not-inside: <... setuid(...) < $VAL ...>
+          - pattern-not-inside: <... !setuid(...) ...>
+          - pattern-not-inside: return setuid(...);
+      - patterns:
+          - pattern: seteuid(...)
+          - pattern-not-inside: $RET = seteuid(...)
+          - pattern-not-inside: <... seteuid(...) == $VAL ...>
+          - pattern-not-inside: <... seteuid(...) != $VAL ...>
+          - pattern-not-inside: <... seteuid(...) < $VAL ...>
+          - pattern-not-inside: <... !seteuid(...) ...>
+          - pattern-not-inside: return seteuid(...);
+  - id: unsafe-ret-strlcpy-strlcat
+    metadata:
+      references:
+        - https://lwn.net/Articles/507319/
+        - https://g.co/kgs/PCHQjJ
+      confidence: MEDIUM
+    message: >-
+      The strlcpy() and strlcat() functions return the total length of the
+      string they tried to create. For strlcpy() that means the length of
+      the source string. For strlcat() that means the initial length of the
+      destination string plus the length of of the source string.
+      Therefore, this return value can be larger than the size of the
+      destination buffer. If it is used unsafely, e.g. as an index to write
+      to the destination buffer, memory corruption might occur.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - pattern: $RET = strlcpy(...)
+      - pattern: $RET = strlcat(...)
+      - pattern: $RET = wcslcpy(...)
+      - pattern: $RET = wcslcat(...)
+      - pattern: $RET += strlcpy(...)
+      - pattern: $RET += strlcat(...)
+      - pattern: $RET += wcslcpy(...)
+      - pattern: $RET += wcslcat(...)
+  - id: integer-overflow-strlen
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/190
+        - https://cwe.mitre.org/data/definitions/680
+        - https://github.com/struct/mms
+      confidence: MEDIUM
+    message: >-
+      The software performs a calculation that can produce an integer
+      overflow or wraparound, when the logic assumes that the resulting
+      value will always be larger than the original value. This can
+      introduce other weaknesses when the calculation is used for resource
+      management or execution control. When influenced by the size of an
+      input it is often easier to overflow a short than an int.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - pattern: (short $LEN) = strlen(...);
+      - pattern: (short int $LEN) = strlen(...);
+      - pattern: (unsigned short $LEN) = strlen(...);
+      - pattern: (unsigned short int $LEN) = strlen(...);
+      - pattern: (short $LEN) = wcslen(...);
+      - pattern: (short int $LEN) = wcslen(...);
+      - pattern: (unsigned short $LEN) = wcslen(...);
+      - pattern: (unsigned short int $LEN) = wcslen(...);
+  - id: off-by-one
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/193
+        - https://cwe.mitre.org/data/definitions/787
+        - https://g.co/kgs/PCHQjJ
+        - https://github.com/struct/mms
+      confidence: MEDIUM
+    message: >-
+      The software calculates or uses an incorrect maximum or minimum value
+      that is 1 more, or 1 less, than the correct value.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - pattern: $BUF[sizeof($BUF)] = $EXPR
+      - patterns:
+          - pattern: $BUF[$LEN] = $EXPR
+          - pattern-inside: |
+              $TYPE $BUF[$LEN];
               ...
-              $V $FACTORY = DocumentBuilderFactory.newInstance();
+              $BUF[$LEN] = $EXPR;
+      - patterns:
+          - pattern: |
+              *($BUF + $LEN) = $EXPR
+          - pattern-inside: |
+              $TYPE $BUF[$LEN];
               ...
-            }
-        - pattern-not-inside: |
-            class $C {
+              *($BUF + $LEN) = $EXPR;
+      - patterns:
+          - pattern: $BUF[$X][$Y] = $EXPR
+          - pattern-either:
+              - pattern-inside: |
+                  $TYPE $BUF[$A][$Y];
+                  ...
+                  $BUF[$X][$Y] = $EXPR;
+              - pattern-inside: |
+                  $TYPE $BUF[$X][$B];
+                  ...
+                  $BUF[$X][$Y] = $EXPR;
+      - pattern: strlen($SRC) > sizeof($DST)
+      - pattern: strlen($SRC) <= sizeof($DST)
+      - pattern: sizeof($DST) < strlen($SRC)
+      - pattern: sizeof($DST) >= strlen($SRC)
+      - patterns:
+          - pattern: strncat($DST, $SRC, $LEN)
+          - metavariable-pattern:
+              metavariable: $LEN
+              patterns:
+                - pattern-not: $VAL - 1
+      - pattern: $STR[strlen($STR) - 1]
+      - pattern: malloc(strlen($STR))
+  - id: buffer-overflow-strncpy-stpncpy-strlcpy
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/806
+        - https://github.com/0xdea/advisories/blob/master/2020-07-solaris-whodo-w.txt
+        - https://dustri.org/b/playing-with-weggli.html
+      confidence: MEDIUM
+    message: >-
+      Functions strncpy(), stpncpy(), and strlcpy() can cause buffer overflows if the destination
+      buffer's remaining size is not correctly accounted for. This can lead to security vulnerabilities
+      and data corruption. Ensure correct buffer size calculations and consider using safer string
+      handling functions to mitigate this risk.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - patterns:
+          - pattern: $FUN($DST, $SRC, $LEN)
+          - metavariable-pattern:
+              metavariable: $FUN
+              pattern-either:
+                - pattern: strncpy
+                - pattern: stpncpy
+                - pattern: strlcpy
+          - pattern-either:
+              - pattern-inside: |
+                  $TYPE $SRC[$LEN];
+                  ...
+              - pattern-inside: |
+                  $TYPE $SRC[$LEN] = $EXPR;
+                  ...
+      - patterns:
+          - pattern: $FUN($DST, $SRC, <... $SRC ...>)
+          - metavariable-pattern:
+              metavariable: $FUN
+              pattern-either:
+                - pattern: strncpy
+                - pattern: stpncpy
+                - pattern: strlcpy
+  - id: overlapping-memory-sprintf-snprintf
+    metadata:
+      references:
+        - https://linux.die.net/man/3/sprintf
+      confidence: MEDIUM
+    message: >-
+      C standards specify that the results are undefined if a call to
+      sprintf(), snprintf(), vsprintf(), or vsnprintf() would cause copying
+      to take place between objects that overlap (e.g., if the target
+      string array and one of the supplied input arguments refer to the
+      same buffer).
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - pattern: sprintf($DST, ..., $DST, ...)
+      - pattern: snprintf($DST, $N, ..., $DST, ...)
+  - id: buffer-overflow-strncat
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/787
+        - https://cwe.mitre.org/data/definitions/193
+        - https://g.co/kgs/PCHQjJ
+      confidence: HIGH
+    message: >-
+      The strncat() function can lead to buffer overflows if used incorrectly, similar to strcat().
+      Misjudging the buffer's remaining size can result in writing past its end. Always calculate
+      the buffer space correctly, accounting for the null terminator, to prevent security risks.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - patterns:
+          - pattern: strncat($DST, $SRC, $LEN)
+          - pattern-either:
+              - pattern-inside: |
+                  $TYPE $DST[$LEN];
+                  ...
+              - pattern-inside: |
+                  $TYPE $DST[$LEN] = $EXPR;
+                  ...
+      - pattern: strncat($DST, $SRC, sizeof($DST))
+      - pattern: strncat($DST, $SRC, strlen($DST))
+      - pattern: strncat($DST, $SRC, sizeof($DST) - strlen($DST))
+  - id: setuid-setgid-ordering-errors
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/696
+        - https://www.usenix.org/legacy/events/sec02/full_papers/chen/chen.pdf
+        - https://g.co/kgs/PCHQjJ
+        - https://github.com/struct/mms
+      confidence: MEDIUM
+    message: >-
+      A compromised process might be able to regain elevated group privileges
+      if set(e)gid() is called after set(e)uid(). A similar case is when
+      privileges are temporarily dropped with seteuid() and then setuid() or
+      seteuid() are called from while under unprivileged user.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - patterns:
+          - pattern: |
+              setuid(...);
               ...
-              $V $FACTORY = DocumentBuilderFactory.newInstance();
-              static {
-                ...
-                $FACTORY.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-                ...
-              }
+              setgid(...);
+          - pattern-not: |
+              setuid(0);
               ...
-            }
-        - pattern-not-inside: |
-            class $C {
+              setgid(...);
+      - patterns:
+          - pattern: |
+              seteuid(...);
               ...
-              $V $FACTORY = DocumentBuilderFactory.newInstance();
-              static {
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-general-entities", false);
-                ...
-              }
+              setegid(...);
+          - pattern-not: |
+              seteuid(0);
               ...
-            }
-        - pattern-not-inside: |
-            class $C {
+              setegid(...);
+          - pattern-not-inside: |
+              seteuid(...);
               ...
-              $V $FACTORY = DocumentBuilderFactory.newInstance();
-              static {
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-general-entities", false);
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                ...
-              }
+              seteuid(0);
               ...
-            }
-  pattern-sinks:
-  - patterns:
-    - pattern: "$FACTORY.newDocumentBuilder();"
-  pattern-sanitizers:
-  - by-side-effect: true
+              setegid(...);
+      - patterns:
+          - pattern: |
+              seteuid(...);
+              ...
+              setuid(...);
+          - pattern-not: |
+              seteuid(0);
+              ...
+              setuid(...);
+          - pattern-not-inside: |
+              seteuid(...);
+              ...
+              seteuid(0);
+              ...
+              setuid(...);
+      - patterns:
+          - pattern: |
+              seteuid(...);
+              ...
+              seteuid(...);
+          - pattern-not: |
+              seteuid(0);
+              ...
+              seteuid(...);
+          - pattern-not: |
+              seteuid(...);
+              ...
+              seteuid(0);
+          - pattern-not-inside: |
+              seteuid(...);
+              ...
+              seteuid(0);
+              ...
+              seteuid(...);
+  - id: improper-deallocation-free
+    metadata:
+      references:
+        - https://cwe.mitre.org/data/definitions/590
+        - https://github.com/shellphish/how2heap/blob/master/glibc_2.23/house_of_spirit.c
+      confidence: MEDIUM
+    message: >-
+      The software calls free() on a pointer to memory that has a short
+      lifetime and was not allocated using associated heap allocation
+      functions such as malloc(), calloc(), or realloc().
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - patterns:
+          - pattern: free($PTR)
+          - pattern-either:
+              - pattern-inside: |
+                  $TYPE $PTR[$LEN];
+                  ...
+              - pattern-inside: |
+                  $TYPE $PTR[$LEN] = $EXPR;
+                  ...
+              - pattern-inside: |
+                  $TYPE $ARR[$LEN];
+                  ...
+                  $PTR = $ARR;
+                  ...
+              - pattern-inside: |
+                  $TYPE $ARR[$LEN] = $EXPR;
+                  ...
+                  $PTR = $ARR;
+                  ...
+      - patterns:
+          - pattern: free(&$VAR)
+          - pattern-either:
+              - pattern-inside: |
+                  $TYPE $VAR;
+                  ...
+              - pattern-inside: |
+                  $TYPE $VAR = $EXPR;
+                  ...
+              - pattern-inside: |
+                  $TYPE $VAR[$LEN];
+                  ...
+              - pattern-inside: |
+                  $TYPE $VAR[$LEN] = $EXPR;
+                  ...
+              - pattern-inside: |
+                  $TYPE * $VAR;
+                  ...
+              - pattern-inside: |
+                  $TYPE * $VAR = $EXPR;
+                  ...
+  - id: memset-argument-order
+    metadata:
+      references:
+        - https://lkml.org/lkml/2009/11/11/336
+        - https://bugs.mysql.com/bug.php?id=23181
+      confidence: HIGH
+    message: >-
+      ncorrect argument order in memset() can result in ineffective memory initialization.
+      Ensure that the character to set and the size arguments are correctly placed to avoid
+      security risks and logical errors.
+    severity: ERROR
+    languages:
+      - c
+      - cpp
+    pattern-either:
+      - pattern: memset($S, $C, 0);
+      - pattern: memset($S, $C, '\0');
+      - pattern: memset($S, sizeof(...), $N);
+      - pattern: memset_explicit($S, $C, 0);
+      - pattern: memset_explicit($S, $C, '\0');
+      - pattern: memset_explicit($S, sizeof(...), $N);
+  - id: file-descriptor-exhaustion
     pattern-either:
     - patterns:
-      - pattern-either:
-        - pattern: '$FACTORY.setFeature("http://apache.org/xml/features/disallow-doctype-decl",
-            true);
-
-            '
-        - pattern: |
-            $FACTORY.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            ...
-            $FACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        - pattern: |
-            $FACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            ...
-            $FACTORY.setFeature("http://xml.org/sax/features/external-general-entities", false);
-      - focus-metavariable: "$FACTORY"
+      - pattern: |
+          $FD = open("/dev/urandom", ...);
+          ...
+          read($FD, ...);
+      - pattern-not: |
+          $FD = open("/dev/urandom", ...);
+          ...
+          $BYTES_READ = read($FD, ...);
     - patterns:
-      - pattern-either:
-        - pattern-inside: |
-            class $C {
-              ...
-              $T $M(...) {
-                ...
-                $FACTORY.setFeature("http://apache.org/xml/features/disallow-doctype-decl",
-                true);
-                ...
-              }
-              ...
-            }
-        - pattern-inside: |
-            class $C {
-              ...
-              $T $M(...) {
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-general-entities", false);
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                ...
-              }
-              ...
-            }
-        - pattern-inside: |
-            class $C {
-              ...
-              $T $M(...) {
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                ...
-                $FACTORY.setFeature("http://xml.org/sax/features/external-general-entities",false);
-                ...
-              }
-              ...
-            }
-      - pattern: "$M($X)"
-      - focus-metavariable: "$X"
-  fix: |
-    $FACTORY.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-    $FACTORY.newDocumentBuilder();
-  languages:
-  - java
-- id: java.lang.security.audit.command-injection-formatted-runtime-call.command-injection-formatted-runtime-call
-  patterns:
-  - metavariable-pattern:
-      metavariable: "$RUNTIME"
-      patterns:
-      - pattern-either:
-        - pattern: "(java.lang.Runtime $R)"
-        - pattern: java.lang.Runtime.getRuntime(...)
-  - pattern-either:
-    - pattern: "$RUNTIME.exec($X + $Y);"
-    - pattern: "$RUNTIME.exec(String.format(...));"
-    - pattern: "$RUNTIME.loadLibrary($X + $Y);"
-    - pattern: "$RUNTIME.loadLibrary(String.format(...));"
-    - patterns:
-      - pattern-either:
-        - pattern: '$RUNTIME.exec("=~/(sh|bash|ksh|csh|tcsh|zsh)/","-c",$ARG,...)
-
-            '
-        - pattern: '$RUNTIME.exec(Arrays.asList("=~/(sh|bash|ksh|csh|tcsh|zsh)/","-c",$ARG,...),...)
-
-            '
-        - pattern: '$RUNTIME.exec(new String[]{"=~/(sh|bash|ksh|csh|tcsh|zsh)/","-c",$ARG,...},...)
-
-            '
-        - patterns:
-          - pattern-either:
-            - pattern: '$RUNTIME.exec($CMD,"-c",$ARG,...)
-
-                '
-            - pattern: '$RUNTIME.exec(Arrays.asList($CMD,"-c",$ARG,...),...)
-
-                '
-            - pattern: '$RUNTIME.exec(new String[]{$CMD,"-c",$ARG,...},...)
-
-                '
-          - pattern-inside: |
-              $CMD = "=~/(sh|bash|ksh|csh|tcsh|zsh)/";
-              ...
-      - pattern-not-inside: |
-          $ARG = "...";
+      - pattern: |
+          $FD = open("/dev/random", ...);
           ...
-      - pattern-not: '$RUNTIME.exec("...","...","...",...)
-
-          '
-      - pattern-not: '$RUNTIME.exec(new String[]{"...","...","...",...},...)
-
-          '
-      - pattern-not: '$RUNTIME.exec(Arrays.asList("...","...","...",...),...)
-
-          '
-  message: A formatted or concatenated string was detected as input to a java.lang.Runtime
-    call. This is dangerous if a variable is controlled by user input and could result
-    in a command injection. Ensure your variables are not controlled by users or sufficiently
-    sanitized.
-  metadata:
-    cwe:
-    - 'CWE-78: Improper Neutralization of Special Elements used in an OS Command (''OS
-      Command Injection'')'
-    owasp:
-    - A01:2017 - Injection
-    - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#COMMAND_INJECTION.
-    category: security
-    technology:
-    - java
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.audit.command-injection-formatted-runtime-call.command-injection-formatted-runtime-call
-    shortlink: https://sg.run/rd90
-    semgrep.dev:
-      rule:
-        rule_id: nJUzvJ
-        version_id: X0TeYk
-        url: https://semgrep.dev/playground/r/X0TeYk/java.lang.security.audit.command-injection-formatted-runtime-call.command-injection-formatted-runtime-call
-  severity: ERROR
-  languages:
-  - java
-- id: java.jboss.security.seam-log-injection.seam-log-injection
-  patterns:
-  - pattern: "$LOG.$INFO($X + $Y,...)\n"
-  - pattern-either:
-    - pattern-inside: |
-        import org.jboss.seam.log.Log;
-        ...
-    - pattern-inside: |
-        org.jboss.seam.log.Log $LOG = ...;
-        ...
-  - metavariable-regex:
-      metavariable: "$INFO"
-      regex: "(debug|error|fatal|info|trace|warn)"
-  languages:
-  - java
-  message: Seam Logging API support an expression language to introduce bean property
-    to log messages. The expression language can also be the source to unwanted code
-    execution. In this context, an expression is built with a dynamic value. The source
-    of the value(s) should be verified to avoid that unfiltered values fall into this
-    risky code evaluation.
-  metadata:
-    cwe:
-    - 'CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code
-      (''Eval Injection'')'
-    owasp:
-    - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#SEAM_LOG_INJECTION
-    category: security
-    technology:
-    - jboss
-    confidence: LOW
-    references:
-    - https://owasp.org/Top10/A03_2021-Injection
-    subcategory:
-    - audit
-    likelihood: LOW
-    impact: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.jboss.security.seam-log-injection.seam-log-injection
-    shortlink: https://sg.run/3A4o
-    semgrep.dev:
-      rule:
-        rule_id: JDUPQ7
-        version_id: zyTX5Q
-        url: https://semgrep.dev/playground/r/zyTX5Q/java.jboss.security.seam-log-injection.seam-log-injection
-  severity: ERROR
-- id: java.lang.security.audit.crypto.gcm-nonce-reuse.gcm-nonce-reuse
-  metadata:
-    cwe:
-    - 'CWE-323: Reusing a Nonce, Key Pair in Encryption'
-    category: security
-    source-rule-url: https://www.youtube.com/watch?v=r1awgAl90wM
-    technology:
-    - java
-    owasp:
-    - A02:2021 - Cryptographic Failures
-    references:
-    - https://owasp.org/Top10/A02_2021-Cryptographic_Failures
-    subcategory:
-    - vuln
-    likelihood: MEDIUM
-    impact: MEDIUM
-    confidence: HIGH
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.lang.security.audit.crypto.gcm-nonce-reuse.gcm-nonce-reuse
-    shortlink: https://sg.run/Dww2
-    semgrep.dev:
-      rule:
-        rule_id: GdUZZ3
-        version_id: kbTZ1q
-        url: https://semgrep.dev/playground/r/kbTZ1q/java.lang.security.audit.crypto.gcm-nonce-reuse.gcm-nonce-reuse
-  languages:
-  - java
-  message: 'GCM IV/nonce is reused: encryption can be totally useless'
-  patterns:
-  - pattern-either:
-    - pattern: new GCMParameterSpec(..., "...".getBytes(...), ...);
-    - pattern: byte[] $NONCE = "...".getBytes(...); ... new GCMParameterSpec(...,
-        $NONCE, ...);
-  severity: ERROR
-- id: java.spring.security.injection.tainted-url-host.tainted-url-host
-  languages:
-  - java
-  severity: ERROR
-  message: User data flows into the host portion of this manually-constructed URL.
-    This could allow an attacker to send data to their own server, potentially exposing
-    sensitive data such as cookies or authorization information sent with this request.
-    They could also probe internal servers or other resources that the server runnig
-    this code can access. (This is called server-side request forgery, or SSRF.) Do
-    not allow arbitrary hosts. Instead, create an allowlist for approved hosts hardcode
-    the correct host, or ensure that the user data can only affect the path or parameters.
-  metadata:
-    cwe:
-    - 'CWE-918: Server-Side Request Forgery (SSRF)'
-    owasp:
-    - A10:2021 - Server-Side Request Forgery (SSRF)
-    references:
-    - https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
-    category: security
-    technology:
-    - java
-    - spring
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-    - vuln
-    impact: MEDIUM
-    likelihood: MEDIUM
-    confidence: MEDIUM
-    deepsemgrep: true
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.spring.security.injection.tainted-url-host.tainted-url-host
-    shortlink: https://sg.run/vkYn
-    semgrep.dev:
-      rule:
-        rule_id: oqUZo8
-        version_id: bZTWvz
-        url: https://semgrep.dev/playground/r/bZTWvz/java.spring.security.injection.tainted-url-host.tainted-url-host
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern-either:
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ($LOOKUP) $TYPE $SOURCE,...) {
-            ...
-          }
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ $TYPE $SOURCE,...) {
-            ...
-          }
-    - metavariable-regex:
-        metavariable: "$REQ"
-        regex: "(RequestBody|PathVariable|RequestParam|RequestHeader|CookieValue)"
-    - pattern: "$SOURCE"
-  pattern-sinks:
-  - pattern-either:
-    - pattern: new URL($ONEARG)
-    - patterns:
-      - pattern-either:
-        - pattern: '"$URLSTR" + ...
-
-            '
-        - pattern: '"$URLSTR".concat(...)
-
-            '
-        - patterns:
-          - pattern-inside: |
-              StringBuilder $SB = new StringBuilder("$URLSTR");
-              ...
-          - pattern: "$SB.append(...)"
-        - patterns:
-          - pattern-inside: |
-              $VAR = "$URLSTR";
-              ...
-          - pattern: "$VAR += ..."
-        - patterns:
-          - pattern: String.format("$URLSTR", ...)
-          - pattern-not: String.format("$URLSTR", "...", ...)
-        - patterns:
-          - pattern-inside: |
-              String $VAR = "$URLSTR";
-              ...
-          - pattern: String.format($VAR, ...)
-      - metavariable-regex:
-          metavariable: "$URLSTR"
-          regex: http(s?)://%(v|s|q).*
-- id: java.spring.security.injection.tainted-file-path.tainted-file-path
-  languages:
-  - java
-  severity: ERROR
-  message: Detected user input controlling a file path. An attacker could control
-    the location of this file, to include going backwards in the directory with '../'.
-    To address this, ensure that user-controlled variables in file paths are sanitized.
-    You may also consider using a utility method such as org.apache.commons.io.FilenameUtils.getName(...)
-    to only retrieve the file name from the path.
-  metadata:
-    cwe:
-    - 'CWE-23: Relative Path Traversal'
-    owasp:
-    - A01:2021 - Broken Access Control
-    references:
-    - https://owasp.org/www-community/attacks/Path_Traversal
-    category: security
-    technology:
-    - java
-    - spring
-    subcategory:
-    - vuln
-    impact: HIGH
-    likelihood: MEDIUM
-    confidence: HIGH
-    deepsemgrep: true
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    source: https://semgrep.dev/r/java.spring.security.injection.tainted-file-path.tainted-file-path
-    shortlink: https://sg.run/x9o0
-    semgrep.dev:
-      rule:
-        rule_id: lBUxok
-        version_id: l4TA1n
-        url: https://semgrep.dev/playground/r/l4TA1n/java.spring.security.injection.tainted-file-path.tainted-file-path
-  mode: taint
-  pattern-sources:
-  - patterns:
-    - pattern-either:
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ($LOOKUP) $TYPE $SOURCE,...) {
-            ...
-          }
-      - pattern-inside: |
-          $METHODNAME(..., @$REQ $TYPE $SOURCE,...) {
-            ...
-          }
-    - metavariable-regex:
-        metavariable: "$REQ"
-        regex: "(RequestBody|PathVariable|RequestParam|RequestHeader|CookieValue|ModelAttribute)"
-    - pattern: "$SOURCE"
-  pattern-sinks:
-  - patterns:
-    - pattern-either:
-      - pattern: new File(...)
-      - pattern: new java.io.File(...)
-      - pattern: new FileReader(...)
-      - pattern: new java.io.FileReader(...)
-      - pattern: new FileInputStream(...)
-      - pattern: new java.io.FileInputStream(...)
-      - pattern: "(Paths $PATHS).get(...)"
-      - patterns:
-        - pattern: "$CLASS.$FUNC(...)\n"
-        - metavariable-regex:
-            metavariable: "$FUNC"
-            regex: "^(getResourceAsStream|getResource)$"
-      - patterns:
-        - pattern-either:
-          - pattern: new ClassPathResource($FILE, ...)
-          - pattern: ResourceUtils.getFile($FILE, ...)
-          - pattern: new FileOutputStream($FILE, ...)
-          - pattern: new java.io.FileOutputStream($FILE, ...)
-          - pattern: new StreamSource($FILE, ...)
-          - pattern: new javax.xml.transform.StreamSource($FILE, ...)
-          - pattern: FileUtils.openOutputStream($FILE, ...)
-        - focus-metavariable: "$FILE"
-  pattern-sanitizers:
-  - pattern: org.apache.commons.io.FilenameUtils.getName(...)
-- id: spring-actuator-fully-enabled
-  pattern: management.endpoints.web.exposure.include=*
-  message: Spring Boot Actuator is fully enabled. This exposes sensitive endpoints
-    such as /actuator/env, /actuator/logfile, /actuator/heapdump and others.
-    Unless you have Spring Security enabled or another means to protect these
-    endpoints, this functionality is available without authentication, causing
-    a significant security risk.
-  severity: ERROR
-  languages:
-    - generic
-  paths:
-    include:
-      - "*properties"
-  metadata:
-    cwe:
-      - "CWE-200: Exposure of Sensitive Information to an Unauthorized Actor"
-    owasp:
-      - A01:2021 - Broken Access Control
-    references:
-      - https://docs.spring.io/spring-boot/docs/current/reference/html/production-ready-features.html#production-ready-endpoints-exposing-endpoints
-      - https://medium.com/walmartglobaltech/perils-of-spring-boot-actuators-misconfiguration-185c43a0f785
-      - https://blog.maass.xyz/spring-actuator-security-part-1-stealing-secrets-using-spring-actuators
-    category: security
-    technology:
-      - spring
-    cwe2021-top25: true
-    subcategory:
-      - vuln
-    likelihood: MEDIUM
-    impact: HIGH
-    confidence: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Mishandled Sensitive Information
-- id: jax-rs-path-traversal
-  metadata:
-    owasp: 'A1: Injection'
-    cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')"
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#PATH_TRAVERSAL_IN
-    references:
-    - https://www.owasp.org/index.php/Path_Traversal
-  message: |
-    Detected a potential path traversal. A malicious actor
-    could control the location of this file, to include going backwards
-    in the directory with '../'. To address this, ensure that user-controlled
-    variables in file paths are sanitized. You may aslso consider using a utility
-    method such as org.apache.commons.io.FilenameUtils.getName(...) to only
-    retrieve the file name from the path.
-  patterns:
-  - pattern-either:
-    - pattern: |
-        $RETURNTYPE $FUNC (..., @PathParam(...) $TYPE $VAR, ...) {
+          read($FD, ...);
+      - pattern-not: |
+          $FD = open("/dev/random", ...);
           ...
-          new File(..., $VAR, ...);
-          ...
-        }
-    - pattern: |-
-        $RETURNTYPE $FUNC (..., @javax.ws.rs.PathParam(...) $TYPE $VAR, ...) {
-          ...
-          new File(..., $VAR, ...);
-          ...
-        }
-  severity: ERROR
-  languages:
-  - java
-
-- id: transformerfactory-dtds-not-disabled
-  severity: ERROR
-  metadata:
-    cwe:
-      - "CWE-611: Improper Restriction of XML External Entity Reference"
-    owasp:
-      - A04:2017 - XML External Entities (XXE)
-      - A05:2021 - Security Misconfiguration
-    asvs:
-      section: V5 Validation, Sanitization and Encoding
-      control_id: 5.5.2 Insecue XML Deserialization
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v55-deserialization-prevention
-      version: "4"
-    references:
-      - https://semgrep.dev/blog/2022/xml-security-in-java
-      - https://semgrep.dev/docs/cheat-sheets/java-xxe/
-      - https://blog.sonarsource.com/secure-xml-processor
-      - https://xerces.apache.org/xerces2-j/features.html
-    category: security
-    technology:
-      - java
-      - xml
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - vuln
-    likelihood: LOW
-    impact: HIGH
-    confidence: HIGH
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - XML Injection
-  message: DOCTYPE declarations are enabled for this TransformerFactory. This is
-    vulnerable to XML external entity attacks. Disable this by setting the
-    attributes "accessExternalDTD" and "accessExternalStylesheet" to "".
-  mode: taint
-  pattern-sources:
-    - by-side-effect: true
-      patterns:
-        - pattern-either:
-            - pattern: |
-                $FACTORY = TransformerFactory.newInstance();
-            - patterns:
-                - pattern: $FACTORY
-                - pattern-inside: |
-                    class $C {
-                      ...
-                      $V $FACTORY = TransformerFactory.newInstance();
-                      ...
-                    }
-                - pattern-not-inside: >
-                    class $C {
-                      ...
-                      $V $FACTORY = TransformerFactory.newInstance();
-                      static {
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-                        ...
-                      }
-                      ...
-                    }
-                - pattern-not-inside: >
-                    class $C {
-                      ...
-                      $V $FACTORY = TransformerFactory.newInstance();
-                      static {
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-                        ...
-                      }
-                      ...
-                    }
-                - pattern-not-inside: >
-                    class $C {
-                      ...
-                      $V $FACTORY = TransformerFactory.newInstance();
-                      static {
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalDTD.*/", "");
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalStylesheet.*/", "");
-                        ...
-                      }
-                      ...
-                    }
-                - pattern-not-inside: >
-                    class $C {
-                      ...
-                      $V $FACTORY = TransformerFactory.newInstance();
-                      static {
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalStylesheet.*/", "");
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalDTD.*/", "");
-                        ...
-                      }
-                      ...
-                    }
-  pattern-sinks:
-    - patterns:
-        - pattern: $FACTORY.newTransformer(...);
-  pattern-sanitizers:
-    - by-side-effect: true
-      pattern-either:
-        - patterns:
-            - pattern-either:
-                - pattern: >
-                    $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET,
-                    ""); ...
-
-                    $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-                - pattern: >
-                    $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD,
-                    "");
-
-                    ...
-
-                    $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-                - pattern: >
-                    $FACTORY.setAttribute("=~/.*accessExternalStylesheet.*/",
-                    ""); ...
-
-                    $FACTORY.setAttribute("=~/.*accessExternalDTD.*/", "");
-                - pattern: >
-                    $FACTORY.setAttribute("=~/.*accessExternalDTD.*/", "");
-
-                    ...
-
-                    $FACTORY.setAttribute("=~/.*accessExternalStylesheet.*/", "");
-            - focus-metavariable: $FACTORY
-        - patterns:
-            - pattern-either:
-                - pattern-inside: >
-                    class $C {
-                      ...
-                      $T $M(...) {
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-                        ...
-                      }
-                      ...
-                    }
-                - pattern-inside: >
-                    class $C {
-                      ...
-                      $T $M(...) {
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-                        ...
-                        $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-                        ...
-                      }
-                      ...
-                    }
-                - pattern-inside: >
-                    class $C {
-                      ...
-                      $T $M(...) {
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalStylesheet.*/", "");
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalDTD.*/", "");
-                        ...
-                      }
-                      ...
-                    }
-                - pattern-inside: >
-                    class $C {
-                      ...
-                      $T $M(...) {
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalDTD.*/", "");
-                        ...
-                        $FACTORY.setAttribute("=~/.*accessExternalStylesheet.*/", "");
-                        ...
-                      }
-                      ...
-                    }
-            - pattern: $M($X)
-            - focus-metavariable: $X
-  fix: >
-    $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-    $FACTORY.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-
-    $FACTORY.newTransformer(...);
-  languages:
-    - java
-- id: crlf-injection-logs
-  message: When data from an untrusted source is put into a logger and not
-    neutralized correctly, an attacker could forge log entries or include
-    malicious content.
-  metadata:
-    cwe:
-      - "CWE-93: Improper Neutralization of CRLF Sequences ('CRLF Injection')"
-    owasp:
-      - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#CRLF_INJECTION_LOGS
-    category: security
-    technology:
-      - java
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    subcategory:
-      - vuln
-    likelihood: LOW
-    impact: MEDIUM
-    confidence: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Improper Validation
-  severity: ERROR
-  languages:
-    - java
-  patterns:
-    - pattern-either:
-        - patterns:
-            - pattern-inside: |
-                class $CLASS {
-                  ...
-                  Logger $LOG = ...;
-                  ...
-                }
-            - pattern-either:
-                - pattern-inside: |
-                    $X $METHOD(...,HttpServletRequest $REQ,...) {
-                      ...
-                    }
-                - pattern-inside: |
-                    $X $METHOD(...,ServletRequest $REQ,...) {
-                      ...
-                    }
-                - pattern-inside: |
-                    $X $METHOD(...) {
-                      ...
-                      HttpServletRequest $REQ = ...;
-                      ...
-                    }
-                - pattern-inside: |
-                    $X $METHOD(...) {
-                      ...
-                      ServletRequest $REQ = ...;
-                      ...
-                    }
-        - pattern-inside: |
-            $X $METHOD(...) {
-              ...
-              Logger $LOG = ...;
-              ...
-              HttpServletRequest $REQ = ...;
-              ...
-            }
-        - pattern-inside: |
-            $X $METHOD(...) {
-              ...
-              Logger $LOG = ...;
-              ...
-              ServletRequest $REQ = ...;
-              ...
-            }
-    - pattern-either:
-        - pattern: |
-            String $VAL = $REQ.getParameter(...);
-            ...
-            $LOG.$LEVEL(<... $VAL ...>);
-        - pattern: |
-            String $VAL = $REQ.getParameter(...);
-            ...
-            $LOG.log($LEVEL,<... $VAL ...>);
-        - pattern: |
-            $LOG.$LEVEL(<... $REQ.getParameter(...) ...>);
-        - pattern: |
-            $LOG.log($LEVEL,<... $REQ.getParameter(...) ...>);
-
-- id: el-injection
-  metadata:
-    cwe:
-      - "CWE-94: Improper Control of Generation of Code ('Code Injection')"
-    owasp:
-      - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#EL_INJECTION
-    category: security
-    technology:
-      - java
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    subcategory:
+          $BYTES_READ = read($FD, ...);
+    message: >-
+      Call to 'read()' without error checking is susceptible to file descriptor
+      exhaustion. Consider using the 'getrandom()' function.
+    metadata:
+      cwe:
+      - 'CWE-774: Allocation of File Descriptors or Handles Without Limits or Throttling'
+      references:
+      - https://lwn.net/Articles/606141/
+      category: security
+      technology:
+      - c
+      confidence: MEDIUM
+      subcategory:
       - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Code Injection
-  message: An expression is built with a dynamic value. The source of the value(s)
-    should be verified to avoid that unfiltered values fall into this risky
-    code evaluation.
-  severity: ERROR
-  languages:
-    - java
-  patterns:
-    - pattern-either:
-        - pattern: |
-            class $CLASS {
-              ...
-              ExpressionFactory $EF;
-              ...
-              $X $METHOD(...) {
-                ...
-                $EF.createValueExpression($CTX,$INPUT,...);
-                ...
-              }
-              ...
-            }
-        - pattern: |
-            class $CLASS {
-              ...
-              ExpressionFactory $EF = ...;
-              ...
-              $X $METHOD(...) {
-                ...
-                $EF.createValueExpression($CTX,$INPUT,...);
-                ...
-              }
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ExpressionFactory $EF = ...;
-              ...
-              $EF.createValueExpression($CTX,$INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ExpressionFactory $EF,...) {
-              ...
-              $EF.createValueExpression($CTX,$INPUT,...);
-              ...
-            }
-        - pattern: |
-            class $CLASS {
-              ...
-              ExpressionFactory $EF;
-              ...
-              $X $METHOD(...) {
-                ...
-                $EF.createMethodExpression($CTX,$INPUT,...);
-                ...
-              }
-              ...
-            }
-        - pattern: |
-            class $CLASS {
-              ...
-              ExpressionFactory $EF = ...;
-              ...
-              $X $METHOD(...) {
-                ...
-                $EF.createMethodExpression($CTX,$INPUT,...);
-                ...
-              }
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ExpressionFactory $EF = ...;
-              ...
-              $EF.createMethodExpression($CTX,$INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ExpressionFactory $EF,...) {
-              ...
-              $EF.createMethodExpression($CTX,$INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(String $INPUT, ...) {
-              ...
-              $OBJECT.buildConstraintViolationWithTemplate($INPUT, ...);
-              ...
-            }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $EF.createValueExpression($CTX,"...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $EF.createValueExpression($CTX,$S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $EF.createMethodExpression($CTX,"...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $EF.createMethodExpression($CTX,$S,...);
-          ...
-        }
-
-- id: java-reverse-shell
-  patterns:
-    - pattern-either:
-        - pattern: |
-            Socket $S=new Socket(...);
-            ...
-            InputStream $SI = $S.getInputStream();
-            ...
-            while(!$S.isClosed())
-            {
-              ...
-              while($SI.available()>0)$PO.write($SI.read());
-              ...
-              $SO.flush();
-              ...
-            }
-    - pattern-inside: |
-        Process $P=new ProcessBuilder(...).redirectErrorStream(true).start();
-        ...
-        $P.destroy();
-  message: Semgrep found potential reverse shell behavior
-  severity: ERROR
-  metadata:
-    cwe:
-      - "CWE-78: Improper Neutralization of Special Elements used in an OS
-        Command ('OS Command Injection')"
-    category: security
-    technology:
-      - java
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
+      likelihood: LOW
+      impact: HIGH
+    languages: [c]
+    severity: ERROR
+  - id: info-leak-on-non-formated-string
+    message: >-
+      Use %s, %d, %c... to format your variables, otherwise this could leak information.
+    metadata:
+      cwe:
+      - 'CWE-532: Insertion of Sensitive Information into Log File'
+      references:
+      - http://nebelwelt.net/files/13PPREW.pdf
+      category: security
+      technology:
+      - c
+      confidence: MEDIUM
+      owasp:
+      - A09:2021 - Security Logging and Monitoring Failures
+      subcategory:
       - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Command Injection
-  languages:
-    - java
-
-- id: jdbc-sql-formatted-string
-  metadata:
-    cwe:
-      - "CWE-89: Improper Neutralization of Special Elements used in an SQL
-        Command ('SQL Injection')"
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#SQL_INJECTION_SPRING_JDBC
-    asvs:
-      section: "V5: Validation, Sanitization and Encoding Verification Requirements"
-      control_id: 5.3.5 Injection
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v53-output-encoding-and-injection-prevention-requirements
-      version: "4"
-    category: security
-    technology:
-      - jdbc
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
+      likelihood: LOW
+      impact: MEDIUM
+    languages: [c]
+    severity: ERROR
+    pattern: printf(argv[$NUM]);
+  - id: buffer-overflow-scanf-fn
+    pattern: scanf(...)
+    message: >-
+      The use of scanf() without proper buffer boundary checks can cause buffer overflows.
+      Replace it with safer functions like fgets() that respect buffer limits to enhance application security.
+    metadata:
+      cwe:
+      - 'CWE-676: Use of Potentially Dangerous Function'
+      references:
+      - http://sekrit.de/webdocs/c/beginners-guide-away-from-scanf.html
+      category: security
+      technology:
+      - c
+      confidence: LOW
+      subcategory:
       - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - SQL Injection
-  message: "Possible JDBC injection detected. Use the parameterized query feature
-    available in queryForObject instead of concatenating or formatting
-    strings: 'jdbc.queryForObject(\"select * from table where name = ?\",
-    Integer.class, parameterName);'"
-  patterns:
-    - pattern-inside: |
-        $JDBC = new JdbcTemplate(...);
-        ...
-    - pattern-either:
-        - pattern: $JDBC.queryForObject($STR + $VAR, ...);
-        - pattern: $JDBC.queryForObject(String.format(...), ...);
-        - pattern: |
-            String $Q = $STR + $VAR;
-            ...
-            $JDBC.queryForObject($Q, ...);
-        - pattern: |
-            String $Q = String.format(...);
-            ...
-            $JDBC.queryForObject($Q, ...);
-        - pattern: |
-            StringBuilder $Q = new StringBuilder(...);
-            ...
-            $Q.append($STR + $VAR);
-            ...
-            $JDBC.queryForObject($Q, ...);
-        - pattern: $JDBC.queryForList($STR + $VAR);
-        - pattern: $JDBC.queryForList(String.format(...));
-        - pattern: |
-            String $Q = $STR + $VAR;
-            ...
-            $JDBC.queryForList($Q);
-        - pattern: |
-            String $Q = String.format(...);
-            ...
-            $JDBC.queryForList($Q);
-        - pattern: |
-            StringBuilder $Q = new StringBuilder(...);
-            ...
-            $Q.append($STR + $VAR);
-            ...
-            $JDBC.queryForList($Q, ...);
-        - pattern: $JDBC.update($STR + $VAR);
-        - pattern: $JDBC.update(String.format(...));
-        - pattern: |
-            String $Q = $STR + $VAR;
-            ...
-            $JDBC.update($Q);
-        - pattern: |
-            String $Q = String.format(...);
-            ...
-            $JDBC.update($Q);
-        - pattern: |
-            StringBuilder $Q = new StringBuilder(...);
-            ...
-            $Q.append($STR + $VAR);
-            ...
-            $JDBC.update($Q, ...);
-        - pattern: $JDBC.execute($STR + $VAR);
-        - pattern: $JDBC.execute(String.format(...));
-        - pattern: |
-            String $Q = $STR + $VAR;
-            ...
-            $JDBC.execute($Q);
-        - pattern: |
-            String $Q = String.format(...);
-            ...
-            $JDBC.execute($Q);
-        - pattern: |
-            StringBuilder $Q = new StringBuilder(...);
-            ...
-            $Q.append($STR + $VAR);
-            ...
-            $JDBC.execute($Q, ...);
-        - pattern: $JDBC.insert($STR + $VAR);
-        - pattern: $JDBC.insert(String.format(...));
-        - pattern: |
-            String $Q = $STR + $VAR;
-            ...
-            $JDBC.insert($Q);
-        - pattern: |
-            String $Q = String.format(...);
-            ...
-            $JDBC.insert($Q);
-        - pattern: |
-            StringBuilder $Q = new StringBuilder(...);
-            ...
-            $Q.append($STR + $VAR);
-            ...
-            $JDBC.insert($Q, ...);
-  severity: ERROR
-  languages:
-    - java
-
-- id: ognl-injection
-  message: A expression is built with a dynamic value. The source of the value(s)
-    should be verified to avoid that unfiltered values fall into this risky
-    code evaluation.
-  metadata:
-    cwe:
-      - "CWE-94: Improper Control of Generation of Code ('Code Injection')"
-    owasp:
-      - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#OGNL_INJECTION
-    category: security
-    technology:
-      - ognl
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    subcategory:
+      likelihood: LOW
+      impact: HIGH
+    languages: [c]
+    severity: ERROR
+  - id: buffer-overflow-strcat-fn
+    pattern-either:
+    - pattern: strcat(...)
+    - pattern: strncat(...)
+    message: >-
+      The strcat() or strncat() functions can cause buffer overflows if not used carefully.
+      Use strcat_s as a safer alternative to prevent memory corruption and maintain security integrity.
+    metadata:
+      cwe:
+      - 'CWE-676: Use of Potentially Dangerous Function'
+      references:
+      - https://nvd.nist.gov/vuln/detail/CVE-2019-12553
+      - https://techblog.mediaservice.net/2020/04/cve-2020-2851-stack-based-buffer-overflow-in-cde-libdtsvc/
+      category: security
+      technology:
+      - c
+      confidence: LOW
+      subcategory:
       - audit
-    likelihood: LOW
-    impact: MEDIUM
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Code Injection
-  severity: ERROR
-  languages:
-    - java
-  patterns:
-    - pattern-either:
-        - pattern: |
-            $X $METHOD(...,OgnlReflectionProvider $P,...) {
-              ...
-              $P.getGetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlReflectionProvider $P,...) {
-              ...
-              $P.getSetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlReflectionProvider $P,...) {
-              ...
-              $P.getField($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlReflectionProvider $P,...) {
-              ...
-              $P.setProperties($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlReflectionProvider $P,...) {
-              ...
-              $P.setProperty($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlReflectionProvider $P,...) {
-              ...
-              $P.getValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlReflectionProvider $P,...) {
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ReflectionProvider $P,...) {
-              ...
-              $P.getGetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ReflectionProvider $P,...) {
-              ...
-              $P.getSetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ReflectionProvider $P,...) {
-              ...
-              $P.getField($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ReflectionProvider $P,...) {
-              ...
-              $P.setProperties($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ReflectionProvider $P,...) {
-              ...
-              $P.setProperty($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ReflectionProvider $P,...) {
-              ...
-              $P.getValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ReflectionProvider $P,...) {
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,TextParseUtil $P,...) {
-              ...
-              $P.translateVariables($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,TextParseUtil $P,...) {
-              ...
-              $P.translateVariablesCollection($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,TextParseUtil $P,...) {
-              ...
-              $P.shallBeIncluded($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,TextParseUtil $P,...) {
-              ...
-              $P.commaDelimitedStringToSet($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,TextParser $P,...) {
-              ...
-              $P.evaluate($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlTextParser $P,...) {
-              ...
-              $P.evaluate($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlUtil $P,...) {
-              ...
-              $P.setProperties($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlUtil $P,...) {
-              ...
-              $P.setProperty($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlUtil $P,...) {
-              ...
-              $P.getValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlUtil $P,...) {
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlUtil $P,...) {
-              ...
-              $P.callMethod($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlUtil $P,...) {
-              ...
-              $P.compile($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,VelocityStrutsUtil $P,...) {
-              ...
-              $P.evaluate($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,StrutsUtil $P,...) {
-              ...
-              $P.isTrue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,StrutsUtil $P,...) {
-              ...
-              $P.findString($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,StrutsUtil $P,...) {
-              ...
-              $P.findValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,StrutsUtil $P,...) {
-              ...
-              $P.getText($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,StrutsUtil $P,...) {
-              ...
-              $P.translateVariables($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,StrutsUtil $P,...) {
-              ...
-              $P.makeSelectList($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,OgnlTool $P,...) {
-              ...
-              $P.findValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ValueStack $P,...) {
-              ...
-              $P.findString($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ValueStack $P,...) {
-              ...
-              $P.findValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ValueStack $P,...) {
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...,ValueStack $P,...) {
-              ...
-              $P.setParameter($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlReflectionProvider $P = ...;
-              ...
-              $P.getGetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlReflectionProvider $P = ...;
-              ...
-              $P.getSetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlReflectionProvider $P = ...;
-              ...
-              $P.getField($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlReflectionProvider $P = ...;
-              ...
-              $P.setProperties($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlReflectionProvider $P = ...;
-              ...
-              $P.setProperty($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlReflectionProvider $P = ...;
-              ...
-              $P.getValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlReflectionProvider $P = ...;
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ReflectionProvider $P = ...;
-              ...
-              $P.getGetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ReflectionProvider $P = ...;
-              ...
-              $P.getSetMethod($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ReflectionProvider $P = ...;
-              ...
-              $P.getField($T, $INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ReflectionProvider $P = ...;
-              ...
-              $P.setProperties($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ReflectionProvider $P = ...;
-              ...
-              $P.setProperty($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ReflectionProvider $P = ...;
-              ...
-              $P.getValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ReflectionProvider $P = ...;
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              TextParseUtil $P = ...;
-              ...
-              $P.translateVariables($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              TextParseUtil $P = ...;
-              ...
-              $P.translateVariablesCollection($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              TextParseUtil $P = ...;
-              ...
-              $P.shallBeIncluded($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              TextParseUtil $P = ...;
-              ...
-              $P.commaDelimitedStringToSet($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              TextParser $P = ...;
-              ...
-              $P.evaluate($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlTextParser $P = ...;
-              ...
-              $P.evaluate($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlUtil $P = ...;
-              ...
-              $P.setProperties($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlUtil $P = ...;
-              ...
-              $P.setProperty($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlUtil $P = ...;
-              ...
-              $P.getValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlUtil $P = ...;
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlUtil $P = ...;
-              ...
-              $P.callMethod($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlUtil $P = ...;
-              ...
-              $P.compile($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              VelocityStrutsUtil $P = ...;
-              ...
-              $P.evaluate($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              StrutsUtil $P = ...;
-              ...
-              $P.isTrue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              StrutsUtil $P = ...;
-              ...
-              $P.findString($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              StrutsUtil $P = ...;
-              ...
-              $P.findValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              StrutsUtil $P = ...;
-              ...
-              $P.getText($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              StrutsUtil $P = ...;
-              ...
-              $P.translateVariables($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              StrutsUtil $P = ...;
-              ...
-              $P.makeSelectList($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              OgnlTool $P = ...;
-              ...
-              $P.findValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ValueStack $P = ...;
-              ...
-              $P.findString($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ValueStack $P = ...;
-              ...
-              $P.findValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ValueStack $P = ...;
-              ...
-              $P.setValue($INPUT,...);
-              ...
-            }
-        - pattern: |
-            $X $METHOD(...) {
-              ...
-              ValueStack $P = ...;
-              ...
-              $P.setParameter($INPUT,...);
-              ...
-            }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.getGetMethod($T,"...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.getSetMethod($T,"...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.getField($T,"...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.setProperties("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.setProperty("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.getValue("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.setValue("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.translateVariables("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.translateVariablesCollection("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.shallBeIncluded("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.commaDelimitedStringToSet("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.evaluate("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.callMethod("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.compile("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.isTrue("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.findString("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.findValue("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.getText("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.makeSelectList("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $P.setParameter("...",...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.getGetMethod($T,$S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.getSetMethod($T,$S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.getField($T,$S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.setProperties($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.setProperty($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.getValue($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.setValue($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.translateVariables($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.translateVariablesCollection($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.shallBeIncluded($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.commaDelimitedStringToSet($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.evaluate($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.callMethod($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.compile($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.isTrue($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.findString($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.findValue($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.getText($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.makeSelectList($S,...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $P.setParameter($S,...);
-          ...
-        }
-- id: hibernate-sqli
-  pattern-either:
-    - patterns:
-        - pattern-either:
-            - pattern-inside: |
-                String $SQL = $X + $Y;
-                ...
-            - pattern-inside: |
-                String $SQL = String.format(...);
-                ...
-            - pattern-inside: |
-                $VAL $FUNC(...,String $SQL,...) {
-                ...
-                }
-        - pattern-not-inside: |
-            String $SQL = "..." + "...";
-            ...
-        - pattern: org.hibernate.criterion.Restrictions.sqlRestriction($SQL,...)
-    - pattern: org.hibernate.criterion.Restrictions.sqlRestriction(String.format(...),...)
-    - patterns:
-        - pattern: org.hibernate.criterion.Restrictions.sqlRestriction($X + $Y,...)
-        - pattern-not: org.hibernate.criterion.Restrictions.sqlRestriction("..." +
-            "...",...)
-    - patterns:
-        - pattern-either:
-            - patterns:
-                - pattern-either:
-                    - pattern-inside: |
-                        String $SQL = $X + $Y;
-                        ...
-                    - pattern-inside: |
-                        String $SQL = String.format(...);
-                        ...
-                    - pattern-inside: |
-                        $TYPE $FUNC(...,String $SQL,...) {
-                          ...
-                        }
-                - pattern-not-inside: |
-                    String $SQL = "..." + "...";
-                    ...
-                - pattern: $SESSION.$METHOD($SQL,...)
-            - pattern: |
-                $SESSION.$METHOD(String.format(...),...);
-            - pattern: |
-                $SESSION.$METHOD($X + $Y,...);
-        - pattern-either:
-            - pattern-inside: |
-                org.hibernate.Session $SESSION = ...;
-                ...
-            - pattern-inside: |
-                $TYPE $FUNC(...,org.hibernate.Session $SESSION,...) {
-                  ...
-                }
-        - pattern-not: |
-            $SESSION.$METHOD("..." + "...",...);
-        - metavariable-regex:
-            metavariable: $METHOD
-            regex: ^(createQuery|createSQLQuery)$
-  message: Detected a formatted string in a SQL statement. This could lead to SQL
-    injection if variables in the SQL statement are not properly sanitized.
-    Use a prepared statements (java.sql.PreparedStatement) instead. You can
-    obtain a PreparedStatement using 'connection.prepareStatement'.
-  metadata:
-    cwe:
-      - "CWE-89: Improper Neutralization of Special Elements used in an SQL
-        Command ('SQL Injection')"
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#SQL_INJECTION_HIBERNATE
-    asvs:
-      section: V5 Stored Cryptography Verification Requirements
-      control_id: 5.3.5 Insecure Custom Algorithm
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v53-output-encoding-and-injection-prevention-requirements
-      version: "4"
-    category: security
-    technology:
-      - hibernate
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - SQL Injection
-  languages:
-    - java
-  severity: ERROR
-
-- id: jdo-sqli
-  pattern-either:
-    - patterns:
-        - pattern-either:
-            - patterns:
-                - pattern-either:
-                    - pattern-inside: |
-                        String $SQL = $X + $Y;
-                        ...
-                    - pattern-inside: |
-                        String $SQL = String.format(...);
-                        ...
-                    - pattern-inside: |
-                        $TYPE $FUNC(...,String $SQL,...) {
-                          ...
-                        }
-                - pattern-not-inside: |
-                    String $SQL = "..." + "...";
-                    ...
-                - pattern: $Q.$METHOD($SQL,...)
-            - pattern: |
-                $Q.$METHOD(String.format(...),...);
-            - pattern: |
-                $Q.$METHOD($X + $Y,...);
-        - pattern-either:
-            - pattern-inside: |
-                javax.jdo.Query $Q = ...;
-                ...
-            - pattern-inside: |
-                $TYPE $FUNC(...,javax.jdo.Query $Q,...) {
-                  ...
-                }
-        - pattern-not: |
-            $Q.$METHOD("..." + "...",...);
-        - metavariable-regex:
-            metavariable: $METHOD
-            regex: ^(setFilter|setGrouping)$
-    - patterns:
-        - pattern-either:
-            - patterns:
-                - pattern-either:
-                    - pattern-inside: |
-                        String $SQL = $X + $Y;
-                        ...
-                    - pattern-inside: |
-                        String $SQL = String.format(...);
-                        ...
-                    - pattern-inside: |
-                        $VAL $FUNC(...,String $SQL,...) {
-                          ...
-                        }
-                - pattern-not-inside: |
-                    String $SQL = "..." + "...";
-                    ...
-                - pattern: $PM.newQuery(...,$SQL,...)
-            - pattern: |
-                $PM.newQuery(...,String.format(...),...);
-            - pattern: |
-                $PM.newQuery(...,$X + $Y,...);
-        - pattern-either:
-            - pattern-inside: |
-                javax.jdo.PersistenceManager $PM = ...;
-                ...
-            - pattern-inside: |
-                $TYPE $FUNC(...,javax.jdo.PersistenceManager $PM,...) {
-                  ...
-                }
-        - pattern-not: |
-            $PM.newQuery(...,"..." + "...",...);
-  message: Detected a formatted string in a SQL statement. This could lead to SQL
-    injection if variables in the SQL statement are not properly sanitized.
-    Use a prepared statements (java.sql.PreparedStatement) instead. You can
-    obtain a PreparedStatement using 'connection.prepareStatement'.
-  languages:
-    - java
-  severity: ERROR
-  metadata:
-    cwe:
-      - "CWE-89: Improper Neutralization of Special Elements used in an SQL
-        Command ('SQL Injection')"
-    category: security
-    technology:
-      - java
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - SQL Injection
-
-- id: jpa-sqli
-  message: Detected a formatted string in a SQL statement. This could lead to SQL
-    injection if variables in the SQL statement are not properly sanitized.
-    Use a prepared statements (java.sql.PreparedStatement) instead. You can
-    obtain a PreparedStatement using 'connection.prepareStatement'.
-  languages:
-    - java
-  severity: ERROR
-  patterns:
-    - pattern-either:
-        - patterns:
-            - pattern-either:
-                - pattern-inside: |
-                    String $SQL = $X + $Y;
-                    ...
-                - pattern-inside: |
-                    String $SQL = String.format(...);
-                    ...
-                - pattern-inside: |
-                    $TYPE $FUNC(...,String $SQL,...) {
-                      ...
-                    }
-            - pattern-not-inside: |
-                String $SQL = "..." + "...";
-                ...
-            - pattern: $EM.$METHOD($SQL,...)
-        - pattern: |
-            $EM.$METHOD(String.format(...),...);
-        - pattern: |
-            $EM.$METHOD($X + $Y,...);
-    - pattern-either:
-        - pattern-inside: |
-            EntityManager $EM = ...;
-            ...
-        - pattern-inside: |
-            $TYPE $FUNC(...,EntityManager $EM,...) {
-              ...
-            }
-    - pattern-not: |
-        $EM.$METHOD("..." + "...",...);
-    - metavariable-regex:
-        metavariable: $METHOD
-        regex: ^(createQuery|createNativeQuery)$
-  metadata:
-    cwe:
-      - "CWE-89: Improper Neutralization of Special Elements used in an SQL
-        Command ('SQL Injection')"
-    category: security
-    technology:
-      - jpa
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - SQL Injection
-
-- id: turbine-sqli
-  pattern-either:
-    - patterns:
-        - pattern-either:
-            - patterns:
-                - pattern-either:
-                    - pattern-inside: |
-                        String $SQL = $X + $Y;
-                        ...
-                    - pattern-inside: |
-                        String $SQL = String.format(...);
-                        ...
-                    - pattern-inside: |
-                        $VAL $FUNC(...,String $SQL,...) {
-                          ...
-                        }
-                - pattern-not-inside: |
-                    String $SQL = "..." + "...";
-                    ...
-                - pattern: $PEER.executeQuery($SQL,...)
-            - pattern: |
-                $PEER.executeQuery(String.format(...),...)
-            - pattern: |
-                $PEER.executeQuery($X + $Y,...)
-        - pattern-not: |
-            $PEER.executeQuery("..." + "...",...)
-        - metavariable-regex:
-            metavariable: $PEER
-            regex: (BasePeer|GroupPeer)
-    - patterns:
-        - pattern-either:
-            - patterns:
-                - pattern-either:
-                    - pattern-inside: |
-                        String $SQL = $X + $Y;
-                        ...
-                    - pattern-inside: |
-                        String $SQL = String.format(...);
-                        ...
-                    - pattern-inside: |
-                        $VAL $FUNC(...,String $SQL,...) {
-                          ...
-                        }
-                - pattern-not-inside: |
-                    String $SQL = "..." + "...";
-                    ...
-                - pattern: $P.executeQuery($SQL,...)
-            - pattern: |
-                $P.executeQuery(String.format(...),...)
-            - pattern: |
-                $P.executeQuery($X + $Y,...)
-        - pattern-either:
-            - pattern-inside: |
-                BasePeer $P = ...;
-                ...
-            - pattern-inside: |
-                GroupPeer $P = ...;
-                ...
-            - pattern-inside: |
-                $VAL $FUNC(...,GroupPeer $P,...) {
-                  ...
-                }
-            - pattern-inside: |
-                $VAL $FUNC(...,BasePeer $P,...) {
-                  ...
-                }
-        - pattern-not: |
-            $P.executeQuery("..." + "...",...)
-  message: Detected a formatted string in a SQL statement. This could lead to SQL
-    injection if variables in the SQL statement are not properly sanitized.
-    Use a prepared statements (java.sql.PreparedStatement) instead. You can
-    obtain a PreparedStatement using 'connection.prepareStatement'.
-  languages:
-    - java
-  severity: ERROR
-  metadata:
-    cwe:
-      - "CWE-89: Improper Neutralization of Special Elements used in an SQL
-        Command ('SQL Injection')"
-    category: security
-    technology:
-      - turbine
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - SQL Injection
-
-- id: vertx-sqli
-  message: Detected a formatted string in a SQL statement. This could lead to SQL
-    injection if variables in the SQL statement are not properly sanitized.
-    Use a prepared statements (java.sql.PreparedStatement) instead. You can
-    obtain a PreparedStatement using 'connection.prepareStatement'.
-  languages:
-    - java
-  severity: ERROR
-  patterns:
-    - pattern-either:
-        - patterns:
-            - pattern-either:
-                - pattern-inside: |
-                    String $SQL = $X + $Y;
-                    ...
-                - pattern-inside: |
-                    String $SQL = String.format(...);
-                    ...
-                - pattern-inside: |
-                    $TYPE $FUNC(...,String $SQL,...) {
-                      ...
-                    }
-            - pattern-not-inside: |
-                String $SQL = "..." + "...";
-                ...
-            - pattern: $SC.$METHOD($SQL,...)
-        - pattern: |
-            $SC.$METHOD(String.format(...),...);
-        - pattern: |
-            $SC.$METHOD($X + $Y,...);
-    - pattern-either:
-        - pattern-inside: |
-            SqlClient $SC = ...;
-            ...
-        - pattern-inside: |
-            SqlConnection $SC = ...;
-            ...
-        - pattern-inside: |
-            $TYPE $FUNC(...,SqlClient $SC,...) {
-              ...
-            }
-        - pattern-inside: |
-            $TYPE $FUNC(...,SqlConnection $SC,...) {
-              ...
-            }
-    - pattern-not: |
-        $SC.$METHOD("..." + "...",...);
-    - metavariable-regex:
-        metavariable: $METHOD
-        regex: ^(query|preparedQuery|prepare)$
-  metadata:
-    cwe:
-      - "CWE-89: Improper Neutralization of Special Elements used in an SQL
-        Command ('SQL Injection')"
-    category: security
-    technology:
-      - vertx
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - SQL Injection
-- id: xml-decoder
-  message: XMLDecoder should not be used to parse untrusted data. Deserializing
-    user input can lead to arbitrary code execution. Use an alternative and
-    explicitly disable external entities. See
-    https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
-    for alternatives and vulnerability prevention.
-  metadata:
-    cwe:
-      - "CWE-611: Improper Restriction of XML External Entity Reference"
-    owasp:
-      - A04:2017 - XML External Entities (XXE)
-      - A05:2021 - Security Misconfiguration
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#XML_DECODER
-    references:
-      - https://semgrep.dev/blog/2022/xml-security-in-java
-      - https://semgrep.dev/docs/cheat-sheets/java-xxe/
-      - https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
-    category: security
-    technology:
-      - java
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - XML Injection
-  severity: ERROR
-  languages:
-    - java
-  patterns:
-    - pattern: |
-        $X $METHOD(...) {
-          ...
-          new XMLDecoder(...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          new XMLDecoder("...");
-          ...
-        }
-    - pattern-not: |-
-        $X $METHOD(...) {
-          ...
-          String $STR = "...";
-          ...
-          new XMLDecoder($STR);
-          ...
-        }
-
-- id: mongodb-nosqli
-  message: Detected non-constant data passed into a NoSQL query using the 'where'
-    evaluation operator. If this data can be controlled by an external user,
-    this is a NoSQL injection. Ensure data passed to the NoSQL query is not
-    user controllable, or properly sanitize the data. Ideally, avoid using the
-    'where' operator at all and instead use the helper methods provided by
-    com.mongodb.client.model.Filters with comparative operators such as eq,
-    ne, lt, gt, etc.
-  languages:
-    - java
-  severity: ERROR
-  patterns:
-    - pattern-either:
-        - pattern: (com.mongodb.BasicDBObject $QUERY).put("$where", $INPUT);
-        - pattern: |
-            (HashMap<String, String> $MAP).put("$where", $INPUT);
-            ...
-            (com.mongodb.BasicDBObject $QUERY).putAll($MAP);
-        - pattern: (com.mongodb.BasicDBObject $QUERY).append("$where", $INPUT);
-        - pattern: new com.mongodb.BasicDBObject("$where", $INPUT);
-        - pattern: |
-            (HashMap<String, String> $MAP).put("$where", $INPUT);
-            ...
-            new com.mongodb.BasicDBObject($MAP);
-        - pattern: |
-            (HashMap<String, String> $MAP).put("$where", $INPUT);
-            ...
-            String json = new JSONObject($MAP).toString();
-            ...
-            (com.mongodb.BasicDBObject $QUERY).parse((String $JSON));
-        - pattern: com.mongodb.BasicDBObjectBuilder.start().add("$where", $INPUT);
-        - pattern: com.mongodb.BasicDBObjectBuilder.start().append("$where", $INPUT);
-        - pattern: com.mongodb.BasicDBObjectBuilder.start("$where", $INPUT);
-        - pattern: |
-            (HashMap<String, String> $MAP).put("$where", $INPUT);
-            ...
-            com.mongodb.BasicDBObjectBuilder.start($MAP);
-    - metavariable-pattern:
-        metavariable: $INPUT
-        patterns:
-          - pattern: |
-              ...
-          - pattern-not: |
-              "..."
-  metadata:
-    category: security
-    technology:
-      - nosql
-      - mongodb
-    cwe:
-      - "CWE-943: Improper Neutralization of Special Elements in Data Query
-        Logic"
-    owasp:
-      - A01:2017 - Injection
-      - A03:2021 - Injection
-    asvs:
-      section: "V5: Validation, Sanitization and Encoding Verification Requirements"
-      control_id: 5.3.4 Injection Prevention
-      control_url: https://github.com/OWASP/ASVS/blob/master/5.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v53-output-encoding-and-injection-prevention
-      version: "5"
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-      - https://www.mongodb.com/docs/manual/tutorial/query-documents/
-      - https://www.mongodb.com/docs/manual/reference/operator/query/where/
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Improper Validation
-
-
-- id: spel-injection
-  message: A Spring expression is built with a dynamic value. The source of the
-    value(s) should be verified to avoid that unfiltered values fall into this
-    risky code evaluation.
-  metadata:
-    cwe:
-      - "CWE-94: Improper Control of Generation of Code ('Code Injection')"
-    owasp:
-      - A03:2021 - Injection
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#SPEL_INJECTION
-    category: security
-    technology:
-      - spring
-    references:
-      - https://owasp.org/Top10/A03_2021-Injection
-    cwe2022-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: HIGH
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Code Injection
-  severity: ERROR
-  languages:
-    - java
-  patterns:
-    - pattern-either:
-        - pattern-inside: |
-            class $CLASS {
-              ...
-              ExpressionParser $PARSER;
-              ...
-            }
-        - pattern-inside: |
-            class $CLASS {
-              ...
-              ExpressionParser $PARSER = ...;
-              ...
-            }
-        - pattern-inside: |
-            $X $METHOD(...) {
-              ...
-              ExpressionParser $PARSER = ...;
-              ...
-            }
-        - pattern-inside: |
-            class $CLASS {
-              ...
-              SpelExpressionParser $PARSER;
-              ...
-            }
-        - pattern-inside: |
-            class $CLASS {
-              ...
-              SpelExpressionParser $PARSER = ...;
-              ...
-            }
-        - pattern-inside: |
-            $X $METHOD(...) {
-              ...
-              SpelExpressionParser $PARSER = ...;
-              ...
-            }
-        - pattern-inside: |
-            class $CLASS {
-              ...
-              TemplateAwareExpressionParser $PARSER;
-              ...
-            }
-        - pattern-inside: |
-            class $CLASS {
-              ...
-              TemplateAwareExpressionParser $PARSER = ...;
-              ...
-            }
-        - pattern-inside: |
-            $X $METHOD(...) {
-              ...
-              TemplateAwareExpressionParser $PARSER = ...;
-              ...
-            }
-    - pattern: |
-        $X $METHOD(...) {
-          ...
-          $PARSER.parseExpression(...);
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          $PARSER.parseExpression("...");
-          ...
-        }
-    - pattern-not: |
-        $X $METHOD(...) {
-          ...
-          String $S = "...";
-          ...
-          $PARSER.parseExpression($S);
-          ...
-        }
-
-- id: spring-csrf-disabled
-  message: CSRF protection is disabled for this configuration. This is a security
-    risk.
-  metadata:
-    cwe:
-      - "CWE-352: Cross-Site Request Forgery (CSRF)"
-    owasp:
-      - A01:2021 - Broken Access Control
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#SPRING_CSRF_PROTECTION_DISABLED
-    asvs:
-      section: V4 Access Control
-      control_id: 4.2.2 CSRF
-      control_url: https://github.com/OWASP/ASVS/blob/master/4.0/en/0x12-V4-Access-Control.md#v42-operation-level-access-control
-      version: "4"
-    category: security
-    technology:
-      - spring
-    references:
-      - https://owasp.org/Top10/A01_2021-Broken_Access_Control
-    cwe2022-top25: true
-    cwe2021-top25: true
-    subcategory:
-      - audit
-    likelihood: LOW
-    impact: MEDIUM
-    confidence: LOW
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Cross-Site Request Forgery (CSRF)
-  severity: ERROR
-  languages:
-    - java
-  pattern: $OBJ.csrf(...).disable(...)
-
-- id: spring-unvalidated-redirect
-  message: Application redirects a user to a destination URL specified by a user
-    supplied parameter that is not validated.
-  metadata:
-    cwe:
-      - "CWE-601: URL Redirection to Untrusted Site ('Open Redirect')"
-    owasp:
-      - A01:2021 - Broken Access Control
-    source-rule-url: https://find-sec-bugs.github.io/bugs.htm#UNVALIDATED_REDIRECT
-    category: security
-    technology:
-      - spring
-    references:
-      - https://owasp.org/Top10/A01_2021-Broken_Access_Control
-    subcategory:
-      - vuln
-    likelihood: MEDIUM
-    impact: MEDIUM
-    confidence: MEDIUM
-    license: Commons Clause License Condition v1.0[LGPL-2.1-only]
-    vulnerability_class:
-      - Open Redirect
-  severity: ERROR
-  languages:
-    - java
-  pattern-either:
-    - pattern: |
-        $X $METHOD(...,String $URL,...) {
-          return "redirect:" + $URL;
-        }
-    - pattern: |
-        $X $METHOD(...,String $URL,...) {
-          ...
-          String $REDIR = "redirect:" + $URL;
-          ...
-          return $REDIR;
-          ...
-        }
-    - pattern: |
-        $X $METHOD(...,String $URL,...) {
-          ...
-          new ModelAndView("redirect:" + $URL);
-          ...
-        }
-    - pattern: |-
-        $X $METHOD(...,String $URL,...) {
-          ...
-          String $REDIR = "redirect:" + $URL;
-          ...
-          new ModelAndView($REDIR);
-          ...
-        }
-
-- id: spring-actuator-sensitive-endpoints-exposure
-  patterns:
-    - pattern-either:
-      - pattern: management.endpoints.web.exposure.include=...heapdump...
-      - pattern: management.endpoints.web.exposure.include=...loginfo...
-  message: |
-    Exposing sensitive Spring Boot Actuator endpoints like /heapdump and /loginfo
-    without proper security measures can lead to unauthorized access to sensitive
-    application data. It's crucial to restrict access to these endpoints by
-    leveraging Spring Security or other protective mechanisms to ensure they are
-    not accessible without proper authentication and authorization.
-  severity: ERROR
-  languages:
-    - generic
-  paths:
-    include:
-      - "*properties"
-  metadata:
-    references:
-      - https://docs.spring.io/spring-boot/docs/current/reference/html/production-ready-features.html#production-ready-endpoints-exposing-endpoints
-      - https://medium.com/walmartglobaltech/perils-of-spring-boot-actuators-misconfiguration-185c43a0f785
-      - https://blog.maass.xyz/spring-actuator-security-part-1-stealing-secrets-using-spring-actuators
+      likelihood: LOW
+      impact: HIGH
+    languages: [c]
+    severity: ERROR
