@@ -1,4 +1,4 @@
-rules:
+liron rules:
   - id: sql-injection-1
     languages:
       - kotlin
