@@ -1,4 +1,4 @@
-rules:
+rules:asd
   - id: sql-injection-1
     languages:
       - kotlin
@@ -55,7 +55,7 @@ rules:
 
               - pattern: |
                   $COPY = $PAR
-                  ...
+                  ...asd
                   $SELECT.plus($PRE).plus(<... $COPY ...>).plus($POST)
               - pattern: |
                   $COPY = $PAR;
