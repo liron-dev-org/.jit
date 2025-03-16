@@ -5,7 +5,7 @@ rules:
         - pattern: ai_hackathon_fn()
         - pattern: catch_this_func()
     message: |
-      Custom Semgrep rule to identify two snippets to POC custom rules of the AI Hackathon
+      Custom Semgrep rule to identify snippets to POC custom rules of the AI Hackathon
     severity: ERROR
     languages:
       - python
