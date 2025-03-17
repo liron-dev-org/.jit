@@ -27,6 +27,6 @@ override:
         static-code-analysis-python-semgrep:
           steps:
             - name: Run semgrep python
-              uses: ${{ context.config.custom_registry || registry.jit.io }}/control-semgrep-alpine:sc-29483-semgrep-control-support-custom-rulesets
+              uses: ${{ context.config.custom_registry || registry.jit.io }}/control-semgrep-alpine:main
               with:
                 args: --json --config=/semgrep-python-config.yml --metrics=off ${WORK_DIR:-.}
