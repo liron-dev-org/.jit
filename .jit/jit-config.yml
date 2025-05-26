@@ -15,3 +15,14 @@ applications:
   exclude_paths: []
   target_url: https://juice-shop.herokuapp.com
   type: web
+- api_domain: demo.everc.com
+  application_name: aa
+  authentication_key: password
+  authentication_mode: selenium
+  authentication_value: ${{ jit_secrets.aa_web }}
+  exclude_paths: []
+  login_page_url: https://demo.everc.com/#/login
+  password: encrypted$AQICAHh4k42GDEppXrD7oIk1VdAOcRSb3578lObCgHNFMXvyugG1oJZ4wSPAjf8SSJqA+E+1AAAAbjBsBgkqhkiG9w0BBwagXzBdAgEAMFgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMNHzhJJGRriBjNb0kAgEQgCtTNF8pUu0TO/rsnQDgOgZ7Y2kMuCywxfTTxQ44Ce3uriEDH1QxTgattBs5
+  target_url: https://demo.everc.com/
+  type: web
+  username: everc_dast
