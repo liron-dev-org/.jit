@@ -13,20 +13,6 @@ items:
   - name: Analyze for Jit Context
     uses: >-
       jitsecurity-controls/jit-plans/items/jit-context/item-jit-context-analysis.yml@latest
-  - name: Scan your web application for vulnerabilities
-    uses: >-
-      jitsecurity-controls/jit-plans/items/runtime/item-web-app-scanner.yml@latest
   - name: Scan your code for vulnerabilities (SAST)
     uses: >-
       jitsecurity-controls/jit-plans/items/code/item-code-vulnerability.yml@latest
-
-override:
-  workflows:
-    sast:
-      jobs:
-        static-code-analysis-python-semgrep:
-          steps:
-            - name: Run semgrep python
-              uses: ${{ context.config.custom_registry || registry.jit.io }}/control-semgrep-alpine:main
-              with:
-                args: --json --config=/semgrep-python-config.yml --metrics=off ${WORK_DIR:-.}
